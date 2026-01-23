@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Geincos Admin | Reporte Gerencial</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
+
+    <style>
+        :root { 
+            --primary: #4f46e5; 
+            --bg-body: #f3f4f6; 
+            --surface: #ffffff; 
+            --text-main: #1e293b; 
+            --text-muted: #64748b; 
+            --success: #10b981; 
+            --danger: #ef4444; 
+            --warning: #f59e0b; 
+            --border: #e2e8f0; 
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        body { background-color: var(--bg-body); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; }
+        
+        /* SIDEBAR */
+        .sidebar { width: 260px; background: var(--surface); border-right: 1px solid var(--border); padding: 24px; display: flex; flex-direction: column; z-index: 50; flex-shrink: 0; }
+        .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 40px; }
+        .brand i { font-size: 1.5rem; color: var(--primary); } 
+        .brand span { font-size: 1.25rem; font-weight: 800; }
+        .menu-label { font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; margin: 20px 0 10px 10px; }
+        .menu-item { padding: 12px 16px; color: var(--text-muted); border-radius: 8px; cursor: pointer; margin-bottom: 4px; font-weight: 500; display: flex; align-items: center; gap: 12px; transition: 0.2s; text-decoration: none; position: relative; }
+        .menu-item:hover { background: #eef2ff; color: var(--primary); }
+        .menu-item.active { background: var(--primary); color: white; }
+
+        /* MAIN CONTENT */
+        .main-content { flex: 1; padding: 32px; overflow-y: auto; display: flex; flex-direction: column; }
+        .header { margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end; }
+        h2 { font-size: 1.8rem; font-weight: 700; margin-bottom: 5px; }
+        p.subtitle { color: var(--text-muted); }
+
+        /* FILTERS */
+        .filters-container { background: var(--surface); padding: 15px; border-radius: 12px; border: 1px solid var(--border); display: flex; gap: 15px; align-items: center; margin-bottom: 30px; box-shadow: 0 2px 5px rgba(0,0,0,0.03); }
+        .filter-group { display: flex; flex-direction: column; gap: 5px; }
+        .filter-group label { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); }
+        .filter-input { padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; outline: none; font-family: inherit; }
+        .btn-filter { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; height: 40px; margin-top: auto; display: flex; align-items: center; gap: 8px; transition: 0.2s; }
+        .btn-filter:hover { opacity: 0.9; }
+        .btn-excel { background: #10b981; color: white; border: none; padding: 6px 15px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; gap: 5px; transition: 0.2s; }
+        .btn-excel:hover { background: #059669; }
+
+        /* KPI CARDS */
+        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .kpi-card { background: var(--surface); padding: 20px; border-radius: 16px; border: 1px solid var(--border); text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.02); }
+        .kpi-num { font-size: 2.5rem; font-weight: 800; color: var(--text-main); margin: 10px 0; }
+        .kpi-label { color: var(--text-muted); font-size: 0.85rem; font-weight: 600; text-transform: uppercase; }
+        .text-green { color: var(--success); }
+        .text-red { color: var(--danger); }
+
+        /* TABLES SECTION */
+        .report-section { 
+            margin-bottom: 30px; 
+            background: var(--surface); 
+            border-radius: 16px; 
+            border: 1px solid var(--border); 
+            display: block; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.03);
+        }
+        
+        .report-header { 
+            padding: 20px 25px; 
+            border-bottom: 1px solid var(--border); 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            background: #f8fafc;
+            border-radius: 16px 16px 0 0;
+        }
+        .report-header h3 { font-size: 1.1rem; font-weight: 700; margin: 0; color: var(--text-main); }
+        
+        /* Scroll independiente */
+        .table-scroll { 
+            width: 100%; 
+            overflow-y: auto; 
+            overflow-x: auto; 
+            max-height: 500px;
+        }
+
+        table { width: 100%; border-collapse: collapse; min-width: 1100px; }
+        
+        th { 
+            text-align: left; 
+            padding: 15px 25px; 
+            background: #ffffff; 
+            font-size: 0.85rem; 
+            color: var(--text-muted); 
+            text-transform: uppercase; 
+            font-weight: 700; 
+            border-bottom: 2px solid var(--border);
+            position: sticky; 
+            top: 0; 
+            z-index: 10;
+            box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1); 
+        }
+        
+        td { padding: 15px 25px; border-bottom: 1px solid #f1f5f9; font-size: 0.9rem; color: var(--text-main); vertical-align: top; }
+        tr:hover { background: #f9fafb; }
+        
+        .badge { padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; display: inline-block; }
+        .badge-success { background: #dcfce7; color: #166534; }
+        .badge-warning { background: #fee2e2; color: #991b1b; }
+        .badge-presente { background: #dcfce7; color: #166534; border:1px solid #bbf7d0; }
+        .badge-tarde { background: #ffedd5; color: #9a3412; border:1px solid #fdba74; }
+        .badge-falta { background: #fee2e2; color: #991b1b; border:1px solid #fca5a5; }
+        .course-tag { display: inline-block; background: #e0e7ff; color: #4338ca; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; margin: 2px; border: 1px solid #c7d2fe; }
+
+        /* PAGINATION */
+        .pagination-controls { display: flex; justify-content: flex-end; align-items: center; padding: 15px 25px; gap: 15px; border-top: 1px solid var(--border); background: #fff; border-radius: 0 0 16px 16px; }
+        .btn-page { background: white; border: 1px solid var(--border); padding: 8px 15px; border-radius: 6px; cursor: pointer; color: var(--text-main); font-weight: 600; transition:0.2s; }
+        .btn-page:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); background: #eef2ff; }
+        .btn-page:disabled { opacity: 0.5; cursor: not-allowed; background: #f3f4f6; }
+        .page-info { font-size: 0.9rem; color: var(--text-muted); font-weight: 500; }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <div class="brand"><i class="fas fa-cube"></i><span>Geincos Admin</span></div>
+        <div class="menu-label">Analítica</div>
+        <div class="menu-item active"><i class="fas fa-chart-pie"></i> Dashboard</div>
+        <a href="panel-admin.html" class="menu-item"><i class="fas fa-arrow-left"></i> Volver al Panel</a>
+        
+        <div class="menu-label">Accesos Rápidos</div>
+        <a href="panel-admin.html" class="menu-item"><i class="fas fa-users"></i> Usuarios</a>
+        <a href="panel-admin.html" class="menu-item"><i class="fas fa-robot"></i> IA Roleplay</a>
+        
+        <div class="menu-item" style="margin-top:auto; color:var(--danger)" onclick="logout()">
+            <i class="fas fa-sign-out-alt"></i> Cerrar Sesión
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="header">
+            <div>
+                <h2>Informe de Gestión (Capacitación)</h2>
+                <p class="subtitle">Reporte exclusivo de postulantes en proceso.</p>
+            </div>
+        </div>
+
+        <div class="filters-container">
+            <div class="filter-group">
+                <label>Fecha Inicio</label>
+                <input type="date" id="dashStart" class="filter-input">
+            </div>
+            <div class="filter-group">
+                <label>Fecha Fin</label>
+                <input type="date" id="dashEnd" class="filter-input">
+            </div>
+            <button class="btn-filter" onclick="applyDashboardFilters()"><i class="fas fa-search"></i> Generar Informe</button>
+        </div>
+
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <div class="kpi-label">Postulantes Únicos</div>
+                <div class="kpi-num" id="kpiEvaluated">0</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Aprobados</div>
+                <div class="kpi-num text-green" id="kpiPassed">0</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">No Aprobados</div>
+                <div class="kpi-num text-red" id="kpiFailed">0</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Efectividad Global</div>
+                <div class="kpi-num" id="kpiAvg">0%</div>
+            </div>
+        </div>
+
+        <div class="report-section">
+            <div class="report-header">
+                <h3>1. Resumen Diario de Gestión (Únicos)</h3>
+                <button class="btn-excel" onclick="exportUniqueDailyTable()"><i class="fas fa-file-excel"></i> Descargar Lista Nominal</button>
+            </div>
+            <div class="table-scroll">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Total Asesores</th>
+                            <th>Aprobados</th>
+                            <th>No Aprobados</th>
+                            <th>Promedio Nota Máx</th>
+                            <th>Efectividad</th>
+                        </tr>
+                    </thead>
+                    <tbody id="summaryTableBody">
+                        <tr><td colspan="6" style="text-align:center; padding:20px;">Cargando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="report-section">
+            <div class="report-header">
+                <h3>2. Detalle Completo de Intentos (Evaluaciones)</h3>
+                <button class="btn-excel" onclick="exportAllAttemptsTable()"><i class="fas fa-file-excel"></i> Descargar Historial</button>
+            </div>
+            <div class="table-scroll">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>DNI</th>
+                            <th>Nombre</th>
+                            <th>Usuario</th>
+                            <th>Curso / Módulo</th>
+                            <th>Nota</th>
+                            <th>Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody id="detailedReportBody">
+                        <tr><td colspan="7" style="text-align:center; padding:20px;">Cargando datos...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="pagination-controls" id="pagControlsAttempts" style="display:none">
+                <span class="page-info">Mostrando <span id="pageStartAttempts">0</span> - <span id="pageEndAttempts">0</span></span>
+                <div>
+                    <button class="btn-page" onclick="prevPageAttempts()">Anterior</button>
+                    <button class="btn-page" onclick="nextPageAttempts()">Siguiente</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="report-section">
+            <div class="report-header">
+                <h3>3. Reporte de Cursos Asignados (Malla Curricular)</h3>
+                <button class="btn-excel" onclick="exportCoursesTable()"><i class="fas fa-file-excel"></i> Descargar Matriz de Cursos</button>
+            </div>
+            <div class="table-scroll">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:150px">DNI</th>
+                            <th style="width:250px">Nombre</th>
+                            <th>Cursos Asignados (Malla)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="coursesReportBody">
+                        <tr><td colspan="3" style="text-align:center; padding:20px;">Cargando datos...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="pagination-controls" id="pagControlsCourses" style="display:none">
+                <span class="page-info">Mostrando <span id="pageStartCourses">0</span> - <span id="pageEndCourses">0</span></span>
+                <div>
+                    <button class="btn-page" onclick="prevPageCourses()">Anterior</button>
+                    <button class="btn-page" onclick="nextPageCourses()">Siguiente</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="report-section">
+            <div class="report-header">
+                <h3>4. Reporte de Asistencia</h3>
+                <button class="btn-excel" onclick="exportAttendanceTable()"><i class="fas fa-file-excel"></i> Descargar Asistencia</button>
+            </div>
+            <div class="table-scroll">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>DNI</th>
+                            <th>Nombre</th>
+                            <th>Grupo</th>
+                            <th>Estado</th>
+                            <th>Observación</th>
+                        </tr>
+                    </thead>
+                    <tbody id="attendanceReportBody">
+                        <tr><td colspan="6" style="text-align:center; padding:20px;">Cargando datos...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="pagination-controls" id="pagControlsAtt" style="display:none">
+                <span class="page-info">Mostrando <span id="pageStartAtt">0</span> - <span id="pageEndAtt">0</span></span>
+                <div>
+                    <button class="btn-page" onclick="prevPageAtt()">Anterior</button>
+                    <button class="btn-page" onclick="nextPageAtt()">Siguiente</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const SB_URL = 'https://xgvfcmadsprjyljtpooo.supabase.co';
+        const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhndmZjbWFkc3ByanlsanRwb29vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY1ODMxNjAsImV4cCI6MjA4MjE1OTE2MH0.XYBbKFE17PfyYMn2SNL5UJrCQmDRbimTQO0jpbX1Zd0';
+        const sbClient = supabase.createClient(SB_URL, SB_KEY);
+
+        // DATA HOLDERS
+        let reportDataUniqueList = []; 
+        let fullAttemptsList = [];
+        let fullCoursesList = []; 
+        let fullAttendanceList = []; // Nueva lista para asistencia
+        
+        // PAGINATION STATES
+        let pageAttempts = 1;
+        let pageCourses = 1;
+        let pageAtt = 1;
+        const itemsPerPage = 50;
+
+        window.onload = () => {
+            const date = new Date();
+            const firstDay = new Date(date.getFullYear(), date.getMonth(), 1);
+            const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+            
+            document.getElementById('dashStart').value = firstDay.toISOString().split('T')[0];
+            document.getElementById('dashEnd').value = lastDay.toISOString().split('T')[0];
+
+            applyDashboardFilters();
+        };
+
+        function logout() { localStorage.clear(); window.location.href='index.html'; }
+
+        async function applyDashboardFilters() {
+            const start = document.getElementById('dashStart').value;
+            const end = document.getElementById('dashEnd').value;
+
+            // Reset Tables UI
+            document.getElementById('summaryTableBody').innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px;">Calculando...</td></tr>';
+            document.getElementById('detailedReportBody').innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px;">Buscando registros...</td></tr>';
+            document.getElementById('coursesReportBody').innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px;">Analizando asignaciones...</td></tr>';
+            document.getElementById('attendanceReportBody').innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px;">Cargando asistencia...</td></tr>';
+
+            // --- 1. TRAER USUARIOS FILTRADOS (SOLO CAPACITACIÓN) ---
+            const { data: users } = await sbClient.from('usuarios').select('*');
+            
+            const userMap = {}; 
+            const capacitacionUsers = []; 
+
+            if(users) {
+                users.forEach(u => {
+                    // FILTRO ESTRICTO: Solo tipo 'capacitacion' (o null)
+                    const isStaff = ['trabajador', 'supervisor', 'calidad'].includes(u.tipo);
+                    
+                    if (!isStaff) {
+                        userMap[u.usuario] = { 
+                            name: u.correo || 'Sin Nombre', 
+                            dni: u.dni || '-',
+                            cartera: u.cartera || '-',
+                            supervisor: u.supervisor || '-',
+                            grupo: u.etiqueta || '-'
+                        };
+                        capacitacionUsers.push(u);
+                    }
+                });
+            }
+
+            // --- 2. EVALUACIONES ---
+            let queryEvals = sbClient.from('evaluaciones').select('*').order('created_at', { ascending: false });
+            if(start) queryEvals = queryEvals.gte('created_at', start);
+            if(end) queryEvals = queryEvals.lte('created_at', end + 'T23:59:59');
+            const { data: evals } = await queryEvals;
+
+            // --- 3. PROCESAR TABLAS 1 y 2 (EVALUACIONES) ---
+            const filteredEvals = evals ? evals.filter(e => userMap[e.usuario]) : [];
+            processEvaluationsData(filteredEvals, userMap);
+
+            // --- 4. PROCESAR TABLA 3 (CURSOS) ---
+            const usersInDateRange = [];
+            if(capacitacionUsers.length > 0) {
+                const startDateObj = new Date(start);
+                const endDateObj = new Date(end + 'T23:59:59');
+                
+                capacitacionUsers.forEach(u => {
+                    const uDate = new Date(u.created_at);
+                    if (uDate >= startDateObj && uDate <= endDateObj) {
+                        usersInDateRange.push(u);
+                    }
+                });
+            }
+
+            if (usersInDateRange.length > 0) {
+                const usernames = usersInDateRange.map(u => u.usuario);
+                const { data: assignments } = await sbClient.from('asignaciones').select('*').in('usuario', usernames);
+                processCoursesData(usersInDateRange, assignments);
+            } else {
+                fullCoursesList = [];
+                renderCoursesTable();
+            }
+
+            // --- 5. PROCESAR TABLA 4 (ASISTENCIA) ---
+            let queryAtt = sbClient.from('asistencias').select('*').order('fecha', { ascending: false });
+            if(start) queryAtt = queryAtt.gte('fecha', start);
+            if(end) queryAtt = queryAtt.lte('fecha', end);
+            const { data: attData } = await queryAtt;
+
+            // Filtrar solo usuarios de capacitación
+            const filteredAtt = attData ? attData.filter(a => userMap[a.usuario]) : [];
+            processAttendanceData(filteredAtt, userMap);
+        }
+
+        // === LOGICA TABLAS 1 Y 2 ===
+        function processEvaluationsData(evals, userMap) {
+            let userMaxAttempt = {}; 
+            fullAttemptsList = []; 
+            reportDataUniqueList = [];
+
+            let totalUniqueEvaluated = 0, totalUniquePassed = 0, totalUniqueFailed = 0;
+
+            if (evals.length > 0) {
+                evals.forEach(e => {
+                    const dateObj = new Date(e.created_at);
+                    const dateStr = dateObj.toLocaleDateString('es-ES'); 
+                    
+                    const uData = userMap[e.usuario];
+
+                    fullAttemptsList.push({
+                        dateDisplay: dateStr,
+                        dni: uData.dni,
+                        name: uData.name,
+                        user: e.usuario,
+                        course: e.curso,
+                        grade: e.nota,
+                        isPass: e.nota >= 14
+                    });
+
+                    if (!userMaxAttempt[e.usuario]) {
+                        userMaxAttempt[e.usuario] = { maxScore: 0, date: dateStr, course: e.curso };
+                    }
+                    if (e.nota > userMaxAttempt[e.usuario].maxScore) {
+                        userMaxAttempt[e.usuario] = { maxScore: e.nota, date: dateStr, course: e.curso };
+                    }
+                });
+            }
+
+            let summaryHTML = '';
+            
+            Object.keys(userMaxAttempt).forEach(user => {
+                const data = userMaxAttempt[user];
+                const uInfo = userMap[user];
+                
+                totalUniqueEvaluated++;
+                const isPass = data.maxScore >= 14;
+                if(isPass) totalUniquePassed++; else totalUniqueFailed++;
+
+                const statusBadge = isPass ? '<span class="badge badge-success">Aprobado</span>' : '<span class="badge badge-warning">Desaprobado</span>';
+
+                summaryHTML += `<tr>
+                    <td>${data.date}</td>
+                    <td>${uInfo.dni}</td>
+                    <td><b>${uInfo.name}</b></td>
+                    <td>${uInfo.cartera}</td>
+                    <td>${uInfo.supervisor}</td>
+                    <td style="font-weight:bold">${data.maxScore}</td>
+                    <td>${statusBadge}</td>
+                </tr>`;
+
+                reportDataUniqueList.push({
+                    "Fecha": data.date, "DNI": uInfo.dni, "Nombre Completo": uInfo.name,
+                    "Usuario": user, "Cartera": uInfo.cartera, "Supervisor": uInfo.supervisor, 
+                    "Nota Máxima": data.maxScore, "Estado": isPass ? "Aprobado" : "Desaprobado"
+                });
+            });
+
+            if (totalUniqueEvaluated === 0) {
+                summaryHTML = '<tr><td colspan="7" style="text-align:center; padding:20px;">No se encontraron evaluaciones en este rango.</td></tr>';
+            }
+
+            document.getElementById('kpiEvaluated').innerText = totalUniqueEvaluated;
+            document.getElementById('kpiPassed').innerText = totalUniquePassed;
+            document.getElementById('kpiFailed').innerText = totalUniqueFailed;
+            const globalEffect = totalUniqueEvaluated > 0 ? ((totalUniquePassed / totalUniqueEvaluated) * 100).toFixed(0) + '%' : '0%';
+            document.getElementById('kpiAvg').innerText = globalEffect;
+            document.getElementById('summaryTableBody').innerHTML = summaryHTML;
+
+            pageAttempts = 1;
+            renderAttemptsTable();
+        }
+
+        // === LOGICA TABLA 3 (MALLA) ===
+        function processCoursesData(users, assignments) {
+            fullCoursesList = [];
+            const assignMap = {};
+            if(assignments) {
+                assignments.forEach(a => {
+                    assignMap[a.usuario] = a.cursos_json ? JSON.parse(a.cursos_json) : [];
+                });
+            }
+
+            users.forEach(u => {
+                const userCourses = assignMap[u.usuario] || [];
+                fullCoursesList.push({
+                    dni: u.dni || '-',
+                    name: u.correo || 'Sin Nombre',
+                    courses: userCourses
+                });
+            });
+
+            pageCourses = 1;
+            renderCoursesTable();
+        }
+
+        // === LOGICA TABLA 4 (ASISTENCIA) ===
+        function processAttendanceData(attData, userMap) {
+            fullAttendanceList = [];
+            
+            if(attData.length > 0) {
+                attData.forEach(a => {
+                    // Formato fecha
+                    const d = new Date(a.fecha);
+                    // Ajuste zona horaria manual simple para visualización correcta
+                    const dateStr = d.toLocaleDateString('es-ES', { timeZone: 'UTC' }); 
+                    
+                    const uData = userMap[a.usuario];
+                    
+                    fullAttendanceList.push({
+                        date: dateStr,
+                        dni: uData.dni,
+                        name: uData.name,
+                        group: uData.grupo,
+                        status: a.estado,
+                        obs: a.observacion || ''
+                    });
+                });
+            }
+            
+            pageAtt = 1;
+            renderAttendanceTable();
+        }
+
+        // === RENDERS & PAGINATION ===
+        function renderAttemptsTable() {
+            const container = document.getElementById('detailedReportBody');
+            const controls = document.getElementById('pagControlsAttempts');
+            
+            if (fullAttemptsList.length === 0) {
+                container.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px;">No se encontraron datos.</td></tr>';
+                controls.style.display = 'none';
+                return;
+            }
+
+            const start = (pageAttempts - 1) * itemsPerPage;
+            const end = Math.min(start + itemsPerPage, fullAttemptsList.length);
+            const pageData = fullAttemptsList.slice(start, end);
+
+            let html = '';
+            pageData.forEach(item => {
+                const statusBadge = item.isPass ? '<span class="badge badge-success">Aprobado</span>' : '<span class="badge badge-warning">Desaprobado</span>';
+                html += `<tr><td>${item.dateDisplay}</td><td>${item.dni}</td><td><b>${item.name}</b></td><td>${item.user}</td><td>${item.course}</td><td style="font-weight:bold">${item.grade}</td><td>${statusBadge}</td></tr>`;
+            });
+
+            container.innerHTML = html;
+            controls.style.display = 'flex';
+            document.getElementById('pageStartAttempts').innerText = start + 1;
+            document.getElementById('pageEndAttempts').innerText = end;
+        }
+        function prevPageAttempts() { if (pageAttempts > 1) { pageAttempts--; renderAttemptsTable(); } }
+        function nextPageAttempts() { if ((pageAttempts * itemsPerPage) < fullAttemptsList.length) { pageAttempts++; renderAttemptsTable(); } }
+
+        function renderCoursesTable() {
+            const container = document.getElementById('coursesReportBody');
+            const controls = document.getElementById('pagControlsCourses');
+            
+            if (fullCoursesList.length === 0) {
+                container.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px;">No hay usuarios de capacitación nuevos en este rango.</td></tr>';
+                controls.style.display = 'none';
+                return;
+            }
+
+            const start = (pageCourses - 1) * itemsPerPage;
+            const end = Math.min(start + itemsPerPage, fullCoursesList.length);
+            const pageData = fullCoursesList.slice(start, end);
+
+            let html = '';
+            pageData.forEach(item => {
+                let coursesHtml = '';
+                if(item.courses.length > 0) {
+                    item.courses.forEach(c => coursesHtml += `<span class="course-tag">${c}</span>`);
+                } else {
+                    coursesHtml = '<span style="color:#999;font-style:italic">Sin asignación</span>';
+                }
+                
+                html += `<tr><td>${item.dni}</td><td><b>${item.name}</b></td><td>${coursesHtml}</td></tr>`;
+            });
+
+            container.innerHTML = html;
+            controls.style.display = 'flex';
+            document.getElementById('pageStartCourses').innerText = start + 1;
+            document.getElementById('pageEndCourses').innerText = end;
+        }
+        function prevPageCourses() { if (pageCourses > 1) { pageCourses--; renderCoursesTable(); } }
+        function nextPageCourses() { if ((pageCourses * itemsPerPage) < fullCoursesList.length) { pageCourses++; renderCoursesTable(); } }
+
+        function renderAttendanceTable() {
+            const container = document.getElementById('attendanceReportBody');
+            const controls = document.getElementById('pagControlsAtt');
+            
+            if (fullAttendanceList.length === 0) {
+                container.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px;">No hay registros de asistencia en este rango.</td></tr>';
+                controls.style.display = 'none';
+                return;
+            }
+
+            const start = (pageAtt - 1) * itemsPerPage;
+            const end = Math.min(start + itemsPerPage, fullAttendanceList.length);
+            const pageData = fullAttendanceList.slice(start, end);
+
+            let html = '';
+            pageData.forEach(item => {
+                let badgeClass = 'badge-success';
+                if(item.status === 'Tarde') badgeClass = 'badge-tarde';
+                if(item.status === 'Falta') badgeClass = 'badge-falta';
+                
+                html += `<tr><td>${item.date}</td><td>${item.dni}</td><td><b>${item.name}</b></td><td>${item.group}</td><td><span class="badge ${badgeClass}">${item.status}</span></td><td>${item.obs}</td></tr>`;
+            });
+
+            container.innerHTML = html;
+            controls.style.display = 'flex';
+            document.getElementById('pageStartAtt').innerText = start + 1;
+            document.getElementById('pageEndAtt').innerText = end;
+        }
+        function prevPageAtt() { if (pageAtt > 1) { pageAtt--; renderAttendanceTable(); } }
+        function nextPageAtt() { if ((pageAtt * itemsPerPage) < fullAttendanceList.length) { pageAtt++; renderAttendanceTable(); } }
+
+        // === EXPORTS ===
+        function exportUniqueDailyTable() {
+            if(reportDataUniqueList.length === 0) return alert("No hay datos");
+            const ws = XLSX.utils.json_to_sheet(reportDataUniqueList);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Asesores Unicos");
+            XLSX.writeFile(wb, "Reporte_Nominal_Unico.xlsx");
+        }
+
+        function exportAllAttemptsTable() {
+            if(fullAttemptsList.length === 0) return alert("No hay datos");
+            const exportData = fullAttemptsList.map(item => ({
+                "Fecha": item.dateDisplay, "DNI": item.dni, "Nombre": item.name, "Usuario": item.user,
+                "Curso": item.course, "Nota": item.grade, "Estado": item.isPass ? "Aprobado" : "Desaprobado"
+            }));
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Historial Completo");
+            XLSX.writeFile(wb, "Reporte_Evaluaciones_Completo.xlsx");
+        }
+
+        function exportCoursesTable() {
+            if(fullCoursesList.length === 0) return alert("No hay datos");
+            
+            const exportData = fullCoursesList.map(item => {
+                let row = { "DNI": item.dni, "Nombre": item.name };
+                item.courses.forEach((c, index) => {
+                    row[`Curso ${index + 1}`] = c;
+                });
+                return row;
+            });
+
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Cursos Asignados");
+            XLSX.writeFile(wb, "Matriz_Cursos.xlsx");
+        }
+
+        function exportAttendanceTable() {
+            if(fullAttendanceList.length === 0) return alert("No hay datos");
+            const ws = XLSX.utils.json_to_sheet(fullAttendanceList);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Asistencia");
+            XLSX.writeFile(wb, "Reporte_Asistencia.xlsx");
+        }
+    </script>
+</body>
+</html>
