@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Geincos Admin | Dashboard de Informes</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
+
+    <style>
+        :root { 
+            --primary: #4f46e5; --bg-body: #f3f4f6; --surface: #ffffff; 
+            --text-main: #1e293b; --text-muted: #64748b; --success: #10b981; 
+            --danger: #ef4444; --warning: #f59e0b; --border: #e2e8f0; 
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        body { background-color: var(--bg-body); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; }
+        
+        .sidebar { width: 260px; background: var(--surface); border-right: 1px solid var(--border); padding: 24px; display: flex; flex-direction: column; z-index: 50; flex-shrink: 0; }
+        .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 40px; }
+        .brand i { font-size: 1.5rem; color: var(--primary); } .brand span { font-size: 1.25rem; font-weight: 800; }
+        .menu-label { font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; margin: 20px 0 10px 10px; }
+        .menu-item { padding: 12px 16px; color: var(--text-muted); border-radius: 8px; cursor: pointer; margin-bottom: 4px; font-weight: 500; display: flex; align-items: center; gap: 12px; transition: 0.2s; text-decoration: none; }
+        .menu-item:hover { background: #eef2ff; color: var(--primary); }
+        .menu-item.active { background: var(--primary); color: white; }
+
+        .main-content { flex: 1; padding: 32px; overflow-y: auto; display: flex; flex-direction: column; }
+        .reports-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .folder-card { background: var(--surface); padding: 25px; border-radius: 20px; border: 1px solid var(--border); text-align: center; cursor: pointer; transition: 0.3s; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+        .folder-card:hover { transform: translateY(-5px); border-color: var(--primary); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+        .folder-card i { font-size: 2.5rem; color: #facc15; margin-bottom: 15px; }
+        .folder-card h3 { font-size: 1rem; font-weight: 700; }
+
+        .report-view { background: white; border-radius: 20px; border: 1px solid var(--border); display: none; flex-direction: column; margin-bottom: 50px; }
+        .report-view.active { display: flex; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from{opacity:0; transform:translateY(10px)} to{opacity:1; transform:translateY(0)} }
+        .report-header { padding: 20px 25px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: #f8fafc; border-radius: 20px 20px 0 0; }
+        
+        .filters-container { background: white; padding: 20px; border-radius: 16px; border: 1px solid var(--border); display: flex; gap: 15px; margin-bottom: 25px; align-items: flex-end; flex-wrap: wrap; }
+        .filter-group { display: flex; flex-direction: column; gap: 5px; }
+        .filter-group label { font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; }
+        .filter-input { padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; outline: none; min-width: 180px; }
+        .btn-filter { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 700; height: 42px; display: flex; align-items: center; gap: 8px; }
+
+        .table-wrapper { width: 100%; overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; min-width: 1100px; }
+        th { text-align: left; padding: 15px 25px; background: #ffffff; font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; border-bottom: 2px solid var(--border); }
+        td { padding: 15px 25px; border-bottom: 1px solid #f1f5f9; font-size: 0.9rem; }
+        
+        .btn-excel { background: #10b981; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 5px; }
+        
+        .att-cell { text-align: center; font-weight: 900; width: 70px; }
+        .att-a { color: var(--success); } .att-t { color: var(--warning); } .att-f { color: var(--danger); }
+        .badge-status { padding: 4px 10px; border-radius: 12px; font-weight: 700; font-size: 0.75rem; text-transform: uppercase; }
+        .bg-pass { background: #dcfce7; color: #166534; }
+        .bg-fail { background: #fee2e2; color: #991b1b; }
+        .bg-warn { background: #fefce8; color: #854d0e; }
+        .bg-wait { background: #f1f5f9; color: #64748b; }
+        .course-tag { display: inline-block; background: #e0e7ff; color: #4338ca; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; margin: 2px; border: 1px solid #c7d2fe; }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <div class="brand"><i class="fas fa-cube"></i><span>Geincos Admin</span></div>
+        <div class="menu-label">Analítica</div>
+        <a href="dashboard.html" class="menu-item active"><i class="fas fa-chart-pie"></i> Dashboard</a>
+        <a href="reportes.html" class="menu-item"><i class="fas fa-file-invoice"></i> Reportes</a>
+        <a href="calidad-ia.html" class="menu-item"><i class="fas fa-check-circle"></i> Calidad IA</a>
+        <div class="menu-label">Gestión</div>
+        <a href="postulantes.html" class="menu-item"><i class="fas fa-users"></i> Postulantes</a>
+        <a href="personal-activo.html" class="menu-item"><i class="fas fa-id-badge"></i> Personal Activo</a>
+        <a href="asistencia.html" class="menu-item"><i class="fas fa-calendar-check"></i> Asistencia</a>
+        <a href="materiales.html" class="menu-item"><i class="fas fa-book"></i> Materiales</a>
+        <a href="examenes.html" class="menu-item"><i class="fas fa-clipboard-check"></i> Exámenes</a>
+        <a href="simuladores.html" class="menu-item"><i class="fas fa-gamepad"></i> Simuladores</a>
+        <a href="ia-roleplay.html" class="menu-item"><i class="fas fa-robot"></i> IA Roleplay</a>
+        <div class="menu-item" style="margin-top:auto; color:var(--danger)" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Cerrar Sesión</div>
+    </div>
+
+    <div class="main-content">
+        <div class="header">
+            <div>
+                <h2>Panel de Control e Informes</h2>
+                <p style="color:var(--text-muted)">Visualización de reportes sincronizados.</p>
+            </div>
+        </div>
+
+        <div class="filters-container">
+            <div class="filter-group"><label>Registro Inicio</label><input type="date" id="dashStart" class="filter-input"></div>
+            <div class="filter-group"><label>Registro Fin</label><input type="date" id="dashEnd" class="filter-input"></div>
+            <div class="filter-group"><label>Grupo / Corte</label><select id="dashGroup" class="filter-input"><option value="">Cargando...</option></select></div>
+            <button class="btn-filter" onclick="refreshCurrentReport()"><i class="fas fa-sync-alt"></i> Actualizar Informe</button>
+        </div>
+
+        <div class="reports-grid">
+            <div class="folder-card" onclick="switchReport('summary')"><i class="fas fa-folder"></i><h3>Consolidado Desempeño</h3></div>
+            <div class="folder-card" onclick="switchReport('attempts')"><i class="fas fa-folder"></i><h3>Detalle de Intentos</h3></div>
+            <div class="folder-card" onclick="switchReport('courses')"><i class="fas fa-folder"></i><h3>Malla Curricular</h3></div>
+            <div class="folder-card" onclick="switchReport('attendance')"><i class="fas fa-folder"></i><h3>Reporte Asistencia</h3></div>
+        </div>
+
+        <div id="reportSummary" class="report-view">
+            <div class="report-header"><h3>Consolidado Nominal</h3><button class="btn-excel" onclick="exportExcel('summary')"><i class="fas fa-file-excel"></i> Excel</button></div>
+            <div class="table-wrapper"><table><thead><tr><th>F. Registro</th><th>F. Cartera</th><th>Último Examen</th><th>DNI</th><th>Nombre</th><th>Cartera</th><th>Supervisor</th><th>Promedio</th><th>Estado</th></tr></thead><tbody id="tbSummary"></tbody></table></div>
+        </div>
+
+        <div id="reportAttempts" class="report-view">
+            <div class="report-header"><h3>Historial de Intentos</h3><button class="btn-excel" onclick="exportExcel('attempts')"><i class="fas fa-file-excel"></i> Excel</button></div>
+            <div class="table-wrapper"><table><thead id="thAttempts"></thead><tbody id="tbAttempts"></tbody></table></div>
+        </div>
+
+        <div id="reportCourses" class="report-view">
+            <div class="report-header"><h3>Malla Curricular Asignada</h3><button class="btn-excel" onclick="exportExcel('courses')"><i class="fas fa-file-excel"></i> Excel</button></div>
+            <div class="table-wrapper"><table><thead><tr><th>DNI</th><th>Nombre</th><th>Cursos Asignados</th></tr></thead><tbody id="tbCourses"></tbody></table></div>
+        </div>
+
+        <div id="reportAttendance" class="report-view">
+            <div class="report-header"><h3>Registro Asistencia (Vista Matriz)</h3><button class="btn-excel" onclick="exportExcel('attendance')"><i class="fas fa-file-excel"></i> Excel</button></div>
+            <div class="table-wrapper"><table><thead id="thAttendance"></thead><tbody id="tbAttendance"></tbody></table></div>
+        </div>
+    </div>
+
+    <script>
+        const SB_URL = 'https://xgvfcmadsprjyljtpooo.supabase.co';
+        const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhndmZjbWFkc3ByanlsanRwb29vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY1ODMxNjAsImV4cCI6MjA4MjE1OTE2MH0.XYBbKFE17PfyYMn2SNL5UJrCQmDRbimTQO0jpbX1Zd0';
+        const sbClient = supabase.createClient(SB_URL, SB_KEY);
+        
+        let currentActiveReport = 'summary';
+        let dataToExport = { summary: [], attempts: [], courses: [], attendance: [] };
+
+        // Función de corrección para evitar desfase de días en fechas
+        function formatSafeDate(dateStr) {
+            if(!dateStr) return '-';
+            if(dateStr.includes('T')) dateStr = dateStr.split('T')[0];
+            const parts = dateStr.split('-');
+            return `${parts[2]}/${parts[1]}/${parts[0]}`;
+        }
+
+        window.onload = async () => {
+            const date = new Date();
+            document.getElementById('dashStart').value = new Date(date.getFullYear(), date.getMonth(), 1).toISOString().split('T')[0];
+            document.getElementById('dashEnd').value = new Date().toISOString().split('T')[0];
+            await loadGroups();
+            switchReport('summary');
+        };
+
+        function logout() { localStorage.clear(); window.location.href='index.html'; }
+
+        async function loadGroups() {
+            const { data } = await sbClient.from('usuarios').select('etiqueta').neq('etiqueta', null);
+            const groups = [...new Set(data.map(u => u.etiqueta))].sort();
+            const sel = document.getElementById('dashGroup');
+            sel.innerHTML = '<option value="">Todos los Grupos</option>';
+            groups.forEach(g => sel.innerHTML += `<option value="${g}">${g}</option>`);
+        }
+
+        function switchReport(type) {
+            currentActiveReport = type;
+            document.querySelectorAll('.report-view').forEach(v => v.classList.remove('active'));
+            const reportMap = { summary: 'reportSummary', attempts: 'reportAttempts', courses: 'reportCourses', attendance: 'reportAttendance' };
+            document.getElementById(reportMap[type]).classList.add('active');
+            refreshCurrentReport();
+        }
+
+        async function refreshCurrentReport() {
+            const group = document.getElementById('dashGroup').value;
+            let query = sbClient.from('usuarios').select('*');
+            if(group) query = query.eq('etiqueta', group);
+            const { data: users } = await query;
+            if(!users) return;
+
+            const uNames = users.map(u => u.usuario);
+
+            if(currentActiveReport === 'summary' || currentActiveReport === 'attempts') {
+                const { data: evals } = await sbClient.from('evaluaciones').select('*').in('usuario', uNames).order('created_at', {ascending: false});
+                renderEvaluationReports(users, evals || []);
+            } else if(currentActiveReport === 'courses') {
+                const { data: assign } = await sbClient.from('asignaciones').select('*').in('usuario', uNames);
+                renderCourses(users, assign || []);
+            } else if(currentActiveReport === 'attendance') {
+                const start = document.getElementById('dashStart').value;
+                const end = document.getElementById('dashEnd').value;
+                const { data: att } = await sbClient.from('asistencias').select('*').in('usuario', uNames).gte('fecha', start).lte('fecha', end).order('fecha', {ascending: true});
+                renderAttendanceMatrix(users, att || []);
+            }
+        }
+
+        function renderEvaluationReports(users, evals) {
+            const uniqueCourses = [...new Set(evals.map(e => e.curso))].sort();
+            let hHead = `<tr><th>DNI</th><th>Nombre Completo</th>`;
+            uniqueCourses.forEach(c => hHead += `<th class="att-cell">${c}</th>`);
+            hHead += `<th>Resultado</th></tr>`;
+            document.getElementById('thAttempts').innerHTML = hHead;
+
+            let hBodyAttempts = '';
+            const matrixAttempts = [];
+            let hBodySummary = '';
+            const summaryExport = [];
+
+            users.forEach(u => {
+                const userEvals = evals.filter(e => e.usuario === u.usuario);
+                
+                let rowAtt = `<tr><td>${u.dni}</td><td><b>${u.correo || u.usuario}</b></td>`;
+                const excelRowAtt = { DNI: u.dni, Nombre: u.correo };
+                let passedCount = 0;
+
+                uniqueCourses.forEach(c => {
+                    const bestAttempt = userEvals.filter(e => e.curso === c).sort((a,b) => b.nota - a.nota)[0];
+                    const val = bestAttempt ? bestAttempt.nota : '-';
+                    const cls = bestAttempt ? (bestAttempt.nota >= 14 ? 'att-a' : 'att-f') : '';
+                    rowAtt += `<td class="att-cell ${cls}">${val}</td>`;
+                    excelRowAtt[c] = val;
+                    if(bestAttempt && bestAttempt.nota >= 14) passedCount++;
+                });
+
+                const finalStatus = passedCount === uniqueCourses.length && uniqueCourses.length > 0 ? 'COMPLETO' : 'PENDIENTE';
+                rowAtt += `<td><span class="badge-status ${finalStatus === 'COMPLETO' ? 'bg-pass' : 'bg-warn'}">${finalStatus}</span></td></tr>`;
+                hBodyAttempts += rowAtt;
+                matrixAttempts.push({...excelRowAtt, Resultado: finalStatus});
+
+                const avg = userEvals.length > 0 ? Math.round(userEvals.reduce((a,b) => a + b.nota, 0) / userEvals.length) : '-';
+                const lastDate = userEvals.length > 0 ? formatSafeDate(userEvals[0].created_at) : '-';
+                const fCartera = formatSafeDate(u.fecha_cartera);
+                const summaryStatus = avg === '-' ? 'Sin Evaluar' : (avg >= 14 ? 'APROBADO' : 'DESAPROBADO');
+                const sumBg = avg >= 14 ? 'bg-pass' : (avg === '-' ? 'bg-wait' : 'bg-fail');
+
+                hBodySummary += `<tr>
+                    <td>${formatSafeDate(u.created_at)}</td>
+                    <td>${fCartera}</td>
+                    <td>${lastDate}</td>
+                    <td>${u.dni}</td>
+                    <td><b>${u.correo}</b></td>
+                    <td>${u.cartera || '-'}</td>
+                    <td>${u.supervisor || '-'}</td>
+                    <td class="att-cell" style="font-weight:800; color:var(--primary)">${avg}</td>
+                    <td><span class="badge-status ${sumBg}">${summaryStatus}</span></td>
+                </tr>`;
+                summaryExport.push({ Registro: formatSafeDate(u.created_at), Fecha_Cartera: fCartera, UltimoExamen: lastDate, DNI: u.dni, Nombre: u.correo, Cartera: u.cartera, Supervisor: u.supervisor, Promedio: avg, Estado: summaryStatus });
+            });
+
+            document.getElementById('tbAttempts').innerHTML = hBodyAttempts;
+            document.getElementById('tbSummary').innerHTML = hBodySummary;
+            dataToExport.attempts = matrixAttempts;
+            dataToExport.summary = summaryExport;
+        }
+
+        function renderCourses(users, assign) {
+            dataToExport.courses = users.map(u => {
+                const a = assign.find(x => x.usuario === u.usuario);
+                const list = a ? JSON.parse(a.cursos_json) : [];
+                return { DNI: u.dni, Nombre: u.correo, Cursos: list.join(', ') };
+            });
+            document.getElementById('tbCourses').innerHTML = dataToExport.courses.map(i => `<tr><td>${i.DNI}</td><td><b>${i.Nombre}</b></td><td>${i.Cursos.split(', ').map(c => `<span class="course-tag">${c}</span>`).join('')}</td></tr>`).join('');
+        }
+
+        function renderAttendanceMatrix(users, att) {
+            const uniqueDates = [...new Set(att.map(a => a.fecha))].sort();
+            let headerHtml = `<tr><th>DNI</th><th>Nombre Completo</th><th>Grupo</th><th>Observación</th>`;
+            uniqueDates.forEach(d => { const p = d.split('-'); headerHtml += `<th class="att-cell">${p[2]}/${p[1]}</th>`; });
+            headerHtml += `</tr>`;
+            document.getElementById('thAttendance').innerHTML = headerHtml;
+
+            let bodyHtml = '';
+            const matrixData = [];
+            users.forEach(u => {
+                const userAtt = att.filter(a => a.usuario === u.usuario);
+                let rowHtml = `<tr><td>${u.dni}</td><td><b>${u.correo || u.usuario}</b></td><td>${u.etiqueta}</td>`;
+                const lastObs = userAtt.length > 0 ? userAtt[userAtt.length - 1].observacion : '-';
+                rowHtml += `<td><small>${lastObs || '-'}</small></td>`;
+                const excelRow = { DNI: u.dni, Nombre: u.correo, Grupo: u.etiqueta, Observacion: lastObs };
+
+                uniqueDates.forEach(d => {
+                    const record = userAtt.find(a => a.fecha === d);
+                    const icon = record ? (record.estado === 'Presente' ? 'A' : (record.estado === 'Tarde' ? 'T' : 'F')) : '-';
+                    const cls = record ? (record.estado === 'Presente' ? 'att-a' : (record.estado === 'Tarde' ? 'att-t' : 'att-f')) : '';
+                    rowHtml += `<td class="att-cell ${cls}">${icon}</td>`;
+                    excelRow[formatSafeDate(d)] = icon;
+                });
+                rowHtml += `</tr>`;
+                bodyHtml += rowHtml;
+                matrixData.push(excelRow);
+            });
+            document.getElementById('tbAttendance').innerHTML = bodyHtml;
+            dataToExport.attendance = matrixData;
+        }
+
+        function exportExcel(type) {
+            const ws = XLSX.utils.json_to_sheet(dataToExport[type]);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Reporte");
+            XLSX.writeFile(wb, `Reporte_${type}.xlsx`);
+        }
+    </script>
+</body>
+</html>

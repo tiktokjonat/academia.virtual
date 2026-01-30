@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Geincos Admin | Personal Activo</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
+
+    <style>
+        :root { --primary: #4f46e5; --bg-body: #f3f4f6; --surface: #ffffff; --text-main: #1e293b; --text-muted: #64748b; --success: #10b981; --danger: #ef4444; --warning: #f59e0b; --border: #e2e8f0; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        body { background-color: var(--bg-body); color: var(--text-main); display: flex; min-height: 100vh; overflow: hidden; }
+        
+        /* SIDEBAR */
+        .sidebar { width: 260px; background: var(--surface); border-right: 1px solid var(--border); padding: 24px; display: flex; flex-direction: column; flex-shrink: 0; position: sticky; top: 0; height: 100vh; z-index: 100; }
+        .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 40px; }
+        .brand i { font-size: 1.5rem; color: var(--primary); }
+        .brand span { font-size: 1.25rem; font-weight: 800; }
+        .menu-label { font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; margin: 20px 0 10px 10px; }
+        .menu-item { padding: 12px 16px; color: var(--text-muted); border-radius: 8px; cursor: pointer; margin-bottom: 4px; font-weight: 500; display: flex; align-items: center; gap: 12px; text-decoration: none; transition: 0.2s; }
+        .menu-item:hover { background: #eef2ff; color: var(--primary); }
+        .menu-item.active { background: var(--primary); color: white; }
+
+        .main-content { flex: 1; padding: 32px; overflow-y: auto; display: flex; flex-direction: column; height: 100vh; }
+        .header { display: flex; justify-content: space-between; margin-bottom: 25px; align-items: flex-end; }
+        
+        /* NAVEGACIÓN BREADCRUMBS */
+        .breadcrumb { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; font-weight: 600; color: var(--text-muted); }
+        .breadcrumb-item { cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 5px; }
+        .breadcrumb-item:hover { color: var(--primary); }
+        .breadcrumb-sep { opacity: 0.5; }
+
+        /* GRID DE CARPETAS */
+        .folder-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .folder-card { background: white; padding: 25px; border-radius: 20px; border: 1px solid var(--border); text-align: center; cursor: pointer; transition: 0.3s; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }
+        .folder-card:hover { transform: translateY(-5px); border-color: var(--primary); box-shadow: 0 10px 15px rgba(0,0,0,0.05); }
+        .folder-icon { font-size: 3rem; color: #facc15; margin-bottom: 15px; }
+        .folder-name { font-weight: 800; font-size: 1rem; }
+        .folder-count { font-size: 0.75rem; color: var(--text-muted); margin-top: 5px; }
+
+        /* TABLA */
+        .table-view { display: none; }
+        .table-view.active { display: block; }
+        .table-container { background: var(--surface); border-radius: 20px; border: 1px solid var(--border); overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #f8fafc; text-align: left; padding: 18px 24px; font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border); }
+        td { padding: 18px 24px; border-bottom: 1px solid #f1f5f9; font-size: 0.9rem; vertical-align: middle; }
+        
+        .user-info b { font-size: 1rem; color: var(--text-main); }
+        .user-info small { color: var(--text-muted); display: block; margin-top: 2px; }
+
+        /* BOTONES ACCIÓN */
+        .action-group { display: flex; gap: 8px; }
+        .btn-action { width: 36px; height: 36px; border-radius: 10px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; color: white; transition: 0.3s; }
+        .btn-edit { background: linear-gradient(135deg, #f59e0b, #d97706); }
+        .btn-delete { background: linear-gradient(135deg, #ef4444, #b91c1c); }
+        .btn-assign { background: linear-gradient(135deg, #10b981, #059669); }
+
+        .btn-main { background: var(--primary); color: white; padding: 12px 24px; border-radius: 10px; border: none; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 10px; transition: 0.2s; }
+        .btn-excel { background: #10b981; }
+
+        /* MODALES */
+        .modal-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(15, 23, 42, 0.7); z-index: 1000; display: none; justify-content: center; align-items: center; backdrop-filter: blur(4px); }
+        .modal-box { background: white; width: 750px; max-width: 95%; padding: 35px; border-radius: 24px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); max-height: 90vh; overflow-y: auto; }
+        .form-control { width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; outline: none; margin-top: 5px; }
+        .modal-section { background: #f8fafc; padding: 20px; border-radius: 15px; border: 1px solid #e2e8f0; margin-top: 20px; }
+        .modal-section-title { font-size: 0.85rem; font-weight: 800; color: var(--primary); margin-bottom: 15px; text-transform: uppercase; }
+
+        .assign-filter { background: #eef2ff; padding: 15px; border-radius: 12px; margin-bottom: 15px; display: flex; gap: 10px; align-items: center; }
+        .assign-scroll { max-height: 350px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 12px; padding: 10px; background: #f8fafc; }
+        .assign-row { display: flex; align-items: center; gap: 12px; background: white; padding: 12px; border: 1px solid #e2e8f0; border-radius: 10px; margin-bottom: 8px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="brand"><i class="fas fa-cube"></i><span>Geincos Admin</span></div>
+        <div class="menu-label">Analítica</div>
+        <a href="dashboard.html" class="menu-item"><i class="fas fa-chart-pie"></i> Dashboard</a>
+        <a href="reportes.html" class="menu-item"><i class="fas fa-file-invoice"></i> Reportes</a>
+        <a href="calidad-ia.html" class="menu-item"><i class="fas fa-check-circle"></i> Calidad IA</a>
+        <a href="resultados-pvp.html" class="menu-item"><i class="fas fa-trophy"></i> Resultados PvP</a>
+        <div class="menu-label">Gestión</div>
+        <a href="postulantes.html" class="menu-item"><i class="fas fa-users"></i> Postulantes</a>
+        <a href="personal-activo.html" class="menu-item active"><i class="fas fa-id-badge"></i> Personal Activo</a>
+        <a href="asistencia.html" class="menu-item"><i class="fas fa-calendar-check"></i> Asistencia</a>
+        <a href="materiales.html" class="menu-item"><i class="fas fa-book"></i> Materiales</a>
+        <a href="examenes.html" class="menu-item"><i class="fas fa-clipboard-check"></i> Exámenes</a>
+        <a href="simuladores.html" class="menu-item"><i class="fas fa-gamepad"></i> Simuladores</a>
+        <a href="ia-roleplay.html" class="menu-item"><i class="fas fa-robot"></i> IA Roleplay</a>
+        <div class="menu-item" style="margin-top:auto; color:var(--danger)" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Cerrar Sesión</div>
+    </div>
+
+    <div class="main-content">
+        <div class="header">
+            <div>
+                <h2 id="viewTitle">Gestión de Personal Activo</h2>
+                <div class="breadcrumb" id="bread"></div>
+            </div>
+            <div style="display:flex; gap:10px">
+                <button class="btn-main btn-excel" onclick="exportPersonalExcel()"><i class="fas fa-file-excel"></i> Descargar Excel</button>
+                <button class="btn-main" style="background:#6366f1" onclick="openBulkAssign()"><i class="fas fa-layer-group"></i> Asignación Grupal</button>
+                <button class="btn-main" onclick="openModal('modalUser', 'create')"><i class="fas fa-plus"></i> Nuevo Personal</button>
+            </div>
+        </div>
+
+        <div id="folderContainer" class="folder-grid"></div>
+
+        <div id="tableView" class="table-view">
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Colaborador / Usuario</th>
+                            <th>F. Cartera</th>
+                            <th>Cartera</th>
+                            <th>Supervisor</th>
+                            <th>Rol / Tipo</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbUsers"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modalUser">
+        <div class="modal-box">
+            <h3>Gestión de Personal</h3>
+            <input type="hidden" id="uId">
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px">
+                <div class="form-group"><label>DNI</label><input id="uDni" class="form-control"></div>
+                <div class="form-group"><label>Nombre Completo</label><input id="uNombre" class="form-control"></div>
+                <div class="form-group"><label>Usuario</label><input id="uUser" class="form-control"></div>
+                <div class="form-group"><label>Grupo (Corte)</label><input id="uTag" class="form-control"></div>
+                <div class="form-group"><label>Contraseña</label><input id="uPass" class="form-control" placeholder="En blanco para no cambiar"></div>
+                <div class="form-group"><label>Tipo</label>
+                    <select id="uTipo" class="form-control">
+                        <option value="trabajador">Trabajador (Operativo)</option>
+                        <option value="supervisor">Supervisor</option>
+                        <option value="calidad">Calidad</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-section">
+                <div class="modal-section-title"><i class="fas fa-key"></i> ACCESOS PLATAFORMA</div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px">
+                    <div class="form-group"><label>Usuario Externo</label><input id="uPlatUser" class="form-control"></div>
+                    <div class="form-group"><label>Pass Externo</label><input id="uPlatPass" class="form-control"></div>
+                </div>
+            </div>
+            <div class="modal-section">
+                <div class="modal-section-title"><i class="fas fa-briefcase"></i> DATOS OPERATIVOS</div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px">
+                    <div class="form-group"><label>Cartera</label><input id="uCartera" class="form-control"></div>
+                    <div class="form-group"><label>Supervisor</label><select id="uSupervisor" class="form-control"><option value="">- Seleccionar -</option></select></div>
+                </div>
+            </div>
+            <div style="text-align:right; margin-top:25px">
+                <button class="btn-main" style="background:var(--text-muted)" onclick="closeModals()">Cancelar</button>
+                <button class="btn-main" onclick="saveUser()">Guardar Cambios</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modalAssign">
+        <div class="modal-box">
+            <h3 id="assignTitle">Malla Curricular</h3>
+            <div id="bulkGroupSelector" style="display:none" class="form-group"><label>Grupo Destino:</label><select id="bulkGroupSelect" class="form-control"></select></div>
+            <div class="assign-filter"><label>Módulo:</label><select id="moduleFilter" class="form-control" onchange="filterMaterials()"><option value="all">Todos</option></select></div>
+            <div class="assign-scroll" id="assignList"></div>
+            <div style="text-align:right; margin-top:20px"><button class="btn-main" style="background:var(--text-muted)" onclick="closeModals()">Cancelar</button><button class="btn-main" onclick="executeAssignment()">Guardar Cambios</button></div>
+        </div>
+    </div>
+
+    <script>
+        const SB_URL = 'https://xgvfcmadsprjyljtpooo.supabase.co';
+        const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhndmZjbWFkc3ByanlsanRwb29vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY1ODMxNjAsImV4cCI6MjA4MjE1OTE2MH0.XYBbKFE17PfyYMn2SNL5UJrCQmDRbimTQO0jpbX1Zd0';
+        const sbClient = supabase.createClient(SB_URL, SB_KEY);
+        
+        let allPersonal = [], allMaterials = [], currentTarget = { type: '', id: '' };
+        const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+
+        window.onload = async () => { await loadFullData(); await loadMaterialsInfo(); await loadSupervisorsList(); };
+
+        async function loadFullData() {
+            const { data } = await sbClient.from('usuarios').select('*').neq('tipo', 'capacitacion').neq('rol','admin');
+            allPersonal = data || [];
+            showMonths();
+        }
+
+        async function loadMaterialsInfo() {
+            const { data } = await sbClient.from('cursos').select('*');
+            allMaterials = data || [];
+            const mods = [...new Set(allMaterials.map(m => m.modulo))].sort();
+            mods.forEach(m => document.getElementById('moduleFilter').innerHTML += `<option value="${m}">${m}</option>`);
+        }
+
+        async function loadSupervisorsList() {
+            const { data } = await sbClient.from('usuarios').select('usuario').eq('tipo', 'supervisor');
+            const sel = document.getElementById('uSupervisor');
+            if(data) data.forEach(s => sel.innerHTML += `<option value="${s.usuario}">${s.usuario}</option>`);
+        }
+
+        function showMonths() {
+            document.getElementById('folderContainer').style.display = 'grid';
+            document.getElementById('tableView').classList.remove('active');
+            document.getElementById('bread').innerHTML = '<span class="breadcrumb-item" onclick="showMonths()"><i class="fas fa-home"></i> Inicio</span>';
+            const months = {};
+            allPersonal.forEach(u => {
+                const date = new Date(u.created_at);
+                const key = `${date.getFullYear()}-${date.getMonth()}`;
+                if(!months[key]) months[key] = { name: `${monthNames[date.getMonth()]} ${date.getFullYear()}`, count: 0 };
+                months[key].count++;
+            });
+            let h = '';
+            Object.entries(months).sort().reverse().forEach(([key, val]) => {
+                h += `<div class="folder-card" onclick="showGroups('${key}', '${val.name}')"><i class="fas fa-folder folder-icon"></i><div class="folder-name">${val.name}</div><div class="folder-count">${val.count} Integrantes</div></div>`;
+            });
+            document.getElementById('folderContainer').innerHTML = h || '<p>No hay registros.</p>';
+        }
+
+        function showGroups(monthKey, monthName) {
+            document.getElementById('bread').innerHTML = `<span class="breadcrumb-item" onclick="showMonths()"><i class="fas fa-home"></i> Inicio</span> <span class="breadcrumb-sep">></span> <span class="breadcrumb-item" onclick="showGroups('${monthKey}', '${monthName}')">${monthName}</span>`;
+            const groups = {};
+            allPersonal.filter(u => { const d = new Date(u.created_at); return `${d.getFullYear()}-${d.getMonth()}` === monthKey; }).forEach(u => { const g = u.etiqueta || 'Sin Grupo'; if(!groups[g]) groups[g] = 0; groups[g]++; });
+            let h = '';
+            Object.entries(groups).forEach(([name, count]) => { h += `<div class="folder-card" onclick="renderTable('${monthKey}', '${monthName}', '${name}')"><i class="fas fa-users folder-icon" style="color:#6366f1"></i><div class="folder-name">${name}</div><div class="folder-count">${count} Usuarios</div></div>`; });
+            document.getElementById('folderContainer').innerHTML = h;
+        }
+
+        function renderTable(monthKey, monthName, groupName) {
+            document.getElementById('folderContainer').style.display = 'none';
+            document.getElementById('tableView').classList.add('active');
+            document.getElementById('bread').innerHTML = `<span class="breadcrumb-item" onclick="showMonths()"><i class="fas fa-home"></i> Inicio</span> <span class="breadcrumb-sep">></span> <span class="breadcrumb-item" onclick="showGroups('${monthKey}', '${monthName}')">${monthName}</span> <span class="breadcrumb-sep">></span> <span class="breadcrumb-item">${groupName}</span>`;
+            const filtered = allPersonal.filter(u => { const d = new Date(u.created_at); return `${d.getFullYear()}-${d.getMonth()}` === monthKey && (u.etiqueta || 'Sin Grupo') === groupName; });
+            let h = '';
+            filtered.forEach(u => {
+                h += `<tr><td><div class="user-info"><b>${u.correo || 'Sin Nombre'}</b><small>${u.usuario} | DNI: ${u.dni}</small></div></td><td>${u.fecha_cartera || '-'}</td><td><b>${u.cartera || '-'}</b></td><td>${u.supervisor || '-'}</td><td><span style="font-size:0.75rem; background:#eef2ff; padding:4px 8px; border-radius:8px; font-weight:700; text-transform:uppercase">${u.tipo}</span></td><td><div class="action-group"><button class="btn-action btn-assign" onclick="openAssignModal('${u.usuario}')"><i class="fas fa-book"></i></button><button class="btn-action btn-edit" onclick="editUser('${u.id}')"><i class="fas fa-pen"></i></button><button class="btn-action btn-delete" onclick="delUser('${u.id}')"><i class="fas fa-trash"></i></button></div></td></tr>`;
+            });
+            document.getElementById('tbUsers').innerHTML = h;
+        }
+
+        function exportPersonalExcel() {
+            if(allPersonal.length === 0) return alert("No hay datos.");
+            const data = allPersonal.map(u => ({ "Nombre Completo": u.correo || 'Sin Nombre', "DNI": u.dni, "Usuario": u.usuario, "Tipo": u.tipo, "F. Cartera": u.fecha_cartera || '-', "Cartera": u.cartera || '-', "Supervisor": u.supervisor || '-', "Grupo": u.etiqueta || 'Sin Grupo' }));
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Personal Activo");
+            XLSX.writeFile(wb, "Reporte_Personal_Activo.xlsx");
+        }
+
+        async function openAssignModal(user) {
+            currentTarget = { type: 'individual', id: user };
+            document.getElementById('assignTitle').innerText = `Malla de: ${user}`;
+            document.getElementById('bulkGroupSelector').style.display = 'none';
+            const { data } = await sbClient.from('asignaciones').select('cursos_json').eq('usuario', user).maybeSingle();
+            let myCourses = data ? JSON.parse(data.cursos_json) : [];
+            let h = '';
+            allMaterials.forEach(m => { h += `<label class="assign-row" data-mod="${m.modulo}"><input type="checkbox" class="chk-m" value="${m.titulo}" ${myCourses.includes(m.titulo)?'checked':''}> <span style="margin-left:10px">${m.titulo}</span><small style="margin-left:auto; opacity:0.6">${m.tipo}</small></label>`; });
+            document.getElementById('assignList').innerHTML = h;
+            document.getElementById('modalAssign').style.display = 'flex';
+        }
+
+        async function openBulkAssign() {
+            currentTarget = { type: 'bulk', id: '' };
+            document.getElementById('assignTitle').innerText = "Asignación Masiva";
+            document.getElementById('bulkGroupSelector').style.display = 'block';
+            const groups = [...new Set(allPersonal.map(u => u.etiqueta))].sort();
+            document.getElementById('bulkGroupSelect').innerHTML = groups.map(g => `<option value="${g}">${g}</option>`).join('');
+            let h = '';
+            allMaterials.forEach(m => { h += `<label class="assign-row" data-mod="${m.modulo}"><input type="checkbox" class="chk-m" value="${m.titulo}"> <span style="margin-left:10px">${m.titulo}</span><small style="margin-left:auto; opacity:0.6">${m.tipo}</small></label>`; });
+            document.getElementById('assignList').innerHTML = h;
+            document.getElementById('modalAssign').style.display = 'flex';
+        }
+
+        function filterMaterials() { const mod = document.getElementById('moduleFilter').value; document.querySelectorAll('.assign-row').forEach(row => { row.style.display = (mod === 'all' || row.dataset.mod === mod) ? 'flex' : 'none'; }); }
+
+        async function executeAssignment() {
+            const list = Array.from(document.querySelectorAll('.chk-m:checked')).map(c => c.value);
+            if(currentTarget.type === 'individual') { await saveMalla(currentTarget.id, list); }
+            else { const group = document.getElementById('bulkGroupSelect').value; const members = allPersonal.filter(u => u.etiqueta === group); for(let u of members) await saveMalla(u.usuario, list); }
+            alert('Malla Actualizada'); closeModals();
+        }
+
+        async function saveMalla(user, list) { const { data } = await sbClient.from('asignaciones').select('id').eq('usuario', user).maybeSingle(); if(data) await sbClient.from('asignaciones').update({cursos_json: JSON.stringify(list)}).eq('id', data.id); else await sbClient.from('asignaciones').insert([{usuario: user, cursos_json: JSON.stringify(list)}]); }
+
+        async function editUser(id) {
+            const u = allPersonal.find(x => x.id == id);
+            if(u) {
+                document.getElementById('uId').value = u.id;
+                document.getElementById('uUser').value = u.usuario;
+                document.getElementById('uDni').value = u.dni;
+                document.getElementById('uNombre').value = u.correo || '';
+                document.getElementById('uTag').value = u.etiqueta || '';
+                document.getElementById('uPlatUser').value = u.usuario_plataforma || '';
+                document.getElementById('uPlatPass').value = u.password_plataforma || '';
+                document.getElementById('uCartera').value = u.cartera || '';
+                document.getElementById('uSupervisor').value = u.supervisor || '';
+                document.getElementById('uTipo').value = u.tipo;
+                document.getElementById('modalUser').style.display = 'flex';
+            }
+        }
+
+        async function saveUser() {
+            const id = document.getElementById('uId').value;
+            const u = { usuario: document.getElementById('uUser').value, dni: document.getElementById('uDni').value, correo: document.getElementById('uNombre').value, etiqueta: document.getElementById('uTag').value, usuario_plataforma: document.getElementById('uPlatUser').value, password_plataforma: document.getElementById('uPlatPass').value, cartera: document.getElementById('uCartera').value, supervisor: document.getElementById('uSupervisor').value, tipo: document.getElementById('uTipo').value };
+            if(document.getElementById('uPass').value) u.password = document.getElementById('uPass').value;
+            await sbClient.from('usuarios').update(u).eq('id', id);
+            closeModals(); loadFullData();
+        }
+
+        function logout() { localStorage.clear(); window.location.href='index.html'; }
+        function closeModals() { document.querySelectorAll('.modal-overlay').forEach(m => m.style.display = 'none'); }
+        async function delUser(id) { if(confirm('¿Eliminar colaborador?')) { await sbClient.from('usuarios').delete().eq('id', id); loadFullData(); } }
+    </script>
+</body>
+</html>
