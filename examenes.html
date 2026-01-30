@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Geincos Admin | Gestión de Exámenes</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <style>
+        :root { --primary: #4f46e5; --bg-body: #f3f4f6; --surface: #ffffff; --text-main: #1e293b; --text-muted: #64748b; --success: #10b981; --danger: #ef4444; --warning: #f59e0b; --border: #e2e8f0; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        body { background-color: var(--bg-body); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; }
+        
+        .sidebar { width: 260px; background: var(--surface); border-right: 1px solid var(--border); padding: 24px; display: flex; flex-direction: column; flex-shrink: 0; }
+        .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 40px; }
+        .brand span { font-size: 1.25rem; font-weight: 800; color: var(--text-main); }
+        .menu-label { font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; margin: 20px 0 10px 10px; }
+        .menu-item { padding: 12px 16px; color: var(--text-muted); border-radius: 8px; cursor: pointer; margin-bottom: 4px; display: flex; align-items: center; gap: 12px; text-decoration: none; font-weight: 500; }
+        .menu-item:hover { background: #eef2ff; color: var(--primary); }
+        .menu-item.active { background: var(--primary); color: white; }
+
+        .main-content { flex: 1; padding: 32px; overflow-y: auto; display: flex; flex-direction: column; }
+        .header { display: flex; justify-content: space-between; margin-bottom: 25px; align-items: center; }
+        h2 { font-size: 1.8rem; font-weight: 700; }
+
+        /* GRID DE CARPETAS */
+        .grid-folders { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .folder-card { background: white; padding: 25px; border-radius: 20px; border: 1px solid var(--border); cursor: pointer; transition: 0.3s; text-align: center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+        .folder-card:hover { transform: translateY(-5px); border-color: var(--primary); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+        .folder-icon { font-size: 3rem; color: #818cf8; margin-bottom: 15px; }
+        .folder-name { font-weight: 800; color: var(--text-main); font-size: 1rem; }
+
+        /* SECCIÓN DETALLE */
+        #viewExamsDetail { display: none; }
+        .module-exams-container { background: white; padding: 25px; border-radius: 20px; border: 1px solid var(--border); margin-bottom: 25px; }
+        .exam-selector-box { display: flex; align-items: center; gap: 15px; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #f1f5f9; }
+        
+        .table-container { background: white; border-radius: 16px; border: 1px solid var(--border); overflow: hidden; }
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; padding: 15px 20px; background: #f8fafc; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; }
+        td { padding: 15px 20px; border-bottom: 1px solid #f1f5f9; font-size: 0.9rem; }
+        
+        .btn-primary { background: var(--primary); color: white; padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+        .btn-back { background: #f1f5f9; color: var(--text-muted); padding: 8px 15px; border-radius: 8px; border: none; cursor: pointer; margin-bottom: 20px; font-weight: 600; transition: 0.2s; }
+        .btn-back:hover { background: #e2e8f0; color: var(--text-main); }
+        .btn-icon { width: 32px; height: 32px; border-radius: 6px; border: none; cursor: pointer; color: white; margin-right: 5px; }
+
+        /* MODAL */
+        .modal-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(15, 23, 42, 0.6); z-index: 1000; display: none; justify-content: center; align-items: center; backdrop-filter: blur(4px); }
+        .modal-box { background: white; width: 650px; max-width: 95%; padding: 30px; border-radius: 20px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
+        .form-group { margin-bottom: 15px; }
+        .form-control { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; outline: none; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="brand"><span>Geincos Admin</span></div>
+        <div class="menu-label">Analítica</div>
+        <a href="dashboard.html" class="menu-item"><i class="fas fa-chart-pie"></i> Dashboard</a>
+        <a href="reportes.html" class="menu-item"><i class="fas fa-file-invoice"></i> Reportes</a>
+        <div class="menu-label">Gestión</div>
+        <a href="postulantes.html" class="menu-item"><i class="fas fa-users"></i> Postulantes</a>
+        <a href="personal-activo.html" class="menu-item"><i class="fas fa-id-badge"></i> Personal Activo</a>
+        <a href="asistencia.html" class="menu-item"><i class="fas fa-calendar-check"></i> Asistencia</a>
+        <a href="materiales.html" class="menu-item"><i class="fas fa-book"></i> Materiales</a>
+        <a href="examenes.html" class="menu-item active"><i class="fas fa-clipboard-check"></i> Exámenes</a>
+        <a href="simuladores.html" class="menu-item"><i class="fas fa-gamepad"></i> Simuladores</a>
+        <a href="ia-roleplay.html" class="menu-item"><i class="fas fa-robot"></i> IA Roleplay</a>
+    </div>
+
+    <div class="main-content">
+        <div class="header">
+            <h2 id="mainTitle">Módulos de Evaluación</h2>
+            <button class="btn-primary" onclick="openModal('modalQuestion', 'create')">+ Nueva Pregunta</button>
+        </div>
+
+        <div id="viewModuleFolders" class="grid-folders"></div>
+
+        <div id="viewExamsDetail">
+            <button class="btn-back" onclick="showFolders()"><i class="fas fa-arrow-left"></i> Volver a Módulos</button>
+            <div class="module-exams-container">
+                <div class="exam-selector-box">
+                    <label style="font-weight:700">Examen:</label>
+                    <select id="selCourseEx" class="form-control" style="max-width:400px" onchange="loadQuestions()"></select>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Pregunta</th>
+                                <th style="width:100px">Puntos</th>
+                                <th style="width:200px">Correcta</th>
+                                <th style="width:120px">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbQuestions"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modalQuestion">
+        <div class="modal-box">
+            <h3>Gestión de Pregunta</h3>
+            <input type="hidden" id="qId">
+            <div class="form-group">
+                <label>Examen Destino</label>
+                <select id="qCourse" class="form-control"></select>
+            </div>
+            <div class="form-group"><label>Texto de la Pregunta</label><input id="qTxt" class="form-control"></div>
+            <div class="form-group"><label>Opción 1</label><input id="op1" class="form-control"></div>
+            <div class="form-group"><label>Opción 2</label><input id="op2" class="form-control"></div>
+            <div class="form-group"><label>Opción 3</label><input id="op3" class="form-control"></div>
+            
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; margin-top:10px">
+                <div class="form-group">
+                    <label>Respuesta Correcta</label>
+                    <select id="qCorrect" class="form-control">
+                        <option value="op1">Opción 1</option>
+                        <option value="op2">Opción 2</option>
+                        <option value="op3">Opción 3</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>Puntos</label><input type="number" id="qPoints" class="form-control" value="2"></div>
+            </div>
+
+            <div style="text-align:right; margin-top:25px; border-top:1px solid #eee; padding-top:20px;">
+                <button class="btn-primary" style="background:#64748b" onclick="closeModals()">Cancelar</button>
+                <button class="btn-primary" onclick="saveQuestion()" style="margin-left:10px">Guardar Pregunta</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SB_URL = 'https://xgvfcmadsprjyljtpooo.supabase.co';
+        const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhndmZjbWFkc3ByanlsanRwb29vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY1ODMxNjAsImV4cCI6MjA4MjE1OTE2MH0.XYBbKFE17PfyYMn2SNL5UJrCQmDRbimTQO0jpbX1Zd0';
+        const sbClient = supabase.createClient(SB_URL, SB_KEY);
+
+        let examModules = {};
+        let currentModule = null;
+
+        window.onload = loadData;
+
+        async function loadData() {
+            const { data: courses } = await sbClient.from('cursos').select('titulo, modulo').eq('tipo', 'examen');
+            const { data: questions } = await sbClient.from('preguntas').select('curso');
+            
+            examModules = {};
+            const allExamTitles = new Set();
+            
+            if(courses) {
+                courses.forEach(c => {
+                    const mod = c.modulo || 'General';
+                    if(!examModules[mod]) examModules[mod] = [];
+                    examModules[mod].push(c.titulo);
+                    allExamTitles.add(c.titulo);
+                });
+            }
+
+            if(questions) {
+                questions.forEach(q => {
+                    if(!allExamTitles.has(q.curso)) {
+                        if(!examModules['General']) examModules['General'] = [];
+                        if(!examModules['General'].includes(q.curso)) examModules['General'].push(q.curso);
+                    }
+                });
+            }
+            renderFolders();
+        }
+
+        function renderFolders() {
+            let h = '';
+            for(let mod in examModules) {
+                h += `<div class="folder-card" onclick="openModule('${mod}')">
+                        <i class="fas fa-folder-open folder-icon"></i>
+                        <div class="folder-name">${mod}</div>
+                        <div style="font-size:0.8rem; color:var(--text-muted); margin-top:5px">${examModules[mod].length} Exámenes</div>
+                    </div>`;
+            }
+            document.getElementById('viewModuleFolders').innerHTML = h;
+            document.getElementById('viewModuleFolders').style.display = 'grid';
+            document.getElementById('viewExamsDetail').style.display = 'none';
+            document.getElementById('mainTitle').innerText = "Módulos de Evaluación";
+        }
+
+        function openModule(mod) {
+            currentModule = mod;
+            document.getElementById('viewModuleFolders').style.display = 'none';
+            document.getElementById('viewExamsDetail').style.display = 'block';
+            document.getElementById('mainTitle').innerText = `Exámenes: ${mod}`;
+
+            const sel = document.getElementById('selCourseEx');
+            sel.innerHTML = examModules[mod].map(e => `<option value="${e}">${e}</option>`).join('');
+            loadQuestions();
+        }
+
+        function showFolders() { renderFolders(); }
+
+        async function loadQuestions() {
+            const course = document.getElementById('selCourseEx').value;
+            if(!course) return;
+            const { data } = await sbClient.from('preguntas').select('*').eq('curso', course).order('id');
+            let h = '';
+            if(data && data.length > 0) {
+                data.forEach(q => {
+                    h += `<tr>
+                        <td><b>${q.pregunta}</b></td>
+                        <td><span style="color:var(--primary); font-weight:700">${q.puntaje || 2} pts</span></td>
+                        <td><span style="background:#dcfce7; color:#166534; padding:3px 8px; border-radius:6px; font-size:0.8rem">${q.correcta.toUpperCase()}</span></td>
+                        <td>
+                            <button class="btn-icon" style="background:var(--warning)" onclick="editQuestion('${q.id}')"><i class="fas fa-pen"></i></button>
+                            <button class="btn-icon" style="background:var(--danger)" onclick="delQuestion('${q.id}')"><i class="fas fa-trash"></i></button>
+                        </td>
+                    </tr>`;
+                });
+            } else {
+                h = '<tr><td colspan="4" style="text-align:center; padding:30px; color:#999">No hay preguntas registradas para este examen.</td></tr>';
+            }
+            document.getElementById('tbQuestions').innerHTML = h;
+        }
+
+        function openModal(id, mode) {
+            document.getElementById(id).style.display = 'flex';
+            if(mode === 'create') {
+                clearForm();
+                const selModal = document.getElementById('qCourse');
+                const selFilter = document.getElementById('selCourseEx');
+                if(selFilter.options.length > 0) {
+                    selModal.innerHTML = selFilter.innerHTML;
+                    selModal.value = selFilter.value;
+                } else {
+                    // Si no hay exámenes en el módulo actual, cargar todos los disponibles
+                    loadAllExamsIntoModal();
+                }
+            }
+        }
+
+        async function loadAllExamsIntoModal() {
+            const { data } = await sbClient.from('cursos').select('titulo').eq('tipo', 'examen');
+            const selModal = document.getElementById('qCourse');
+            if(data) selModal.innerHTML = data.map(d => `<option value="${d.titulo}">${d.titulo}</option>`).join('');
+        }
+
+        function closeModals() { document.querySelectorAll('.modal-overlay').forEach(m => m.style.display = 'none'); }
+
+        async function saveQuestion() {
+            const id = document.getElementById('qId').value;
+            const payload = {
+                curso: document.getElementById('qCourse').value,
+                pregunta: document.getElementById('qTxt').value,
+                opcion1: document.getElementById('op1').value,
+                opcion2: document.getElementById('op2').value,
+                opcion3: document.getElementById('op3').value,
+                correcta: document.getElementById('qCorrect').value,
+                puntaje: parseInt(document.getElementById('qPoints').value) || 2
+            };
+            if(id) await sbClient.from('preguntas').update(payload).eq('id', id);
+            else await sbClient.from('preguntas').insert([payload]);
+            closeModals();
+            loadQuestions();
+        }
+
+        async function editQuestion(id) {
+            const { data } = await sbClient.from('preguntas').select('*').eq('id', id).single();
+            if(data) {
+                document.getElementById('qId').value = data.id;
+                document.getElementById('qTxt').value = data.pregunta;
+                document.getElementById('op1').value = data.opcion1;
+                document.getElementById('op2').value = data.opcion2;
+                document.getElementById('op3').value = data.opcion3;
+                document.getElementById('qCorrect').value = data.correcta;
+                document.getElementById('qPoints').value = data.puntaje || 2;
+                const selModal = document.getElementById('qCourse');
+                selModal.innerHTML = `<option value="${data.curso}">${data.curso}</option>`;
+                openModal('modalQuestion', 'edit');
+            }
+        }
+
+        async function delQuestion(id) {
+            if(confirm('¿Seguro que deseas eliminar esta pregunta?')) {
+                await sbClient.from('preguntas').delete().eq('id', id);
+                loadQuestions();
+            }
+        }
+
+        function clearForm() {
+            document.getElementById('qId').value = '';
+            document.getElementById('qTxt').value = '';
+            document.getElementById('op1').value = '';
+            document.getElementById('op2').value = '';
+            document.getElementById('op3').value = '';
+            document.getElementById('qPoints').value = '2';
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Geincos Admin | Reportes y Certificación</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
+
+    <style>
+        :root { 
+            --primary: #4f46e5; --bg-body: #f3f4f6; --surface: #ffffff; 
+            --text-main: #1e293b; --text-muted: #64748b; --success: #10b981; 
+            --danger: #ef4444; --warning: #f59e0b; --border: #e2e8f0; 
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        body { background-color: var(--bg-body); color: var(--text-main); display: flex; min-height: 100vh; }
+        
+        /* SIDEBAR COMPLETA */
+        .sidebar { width: 260px; background: var(--surface); border-right: 1px solid var(--border); padding: 24px; display: flex; flex-direction: column; z-index: 50; flex-shrink: 0; position: sticky; top: 0; height: 100vh; }
+        .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 40px; }
+        .brand i { font-size: 1.5rem; color: var(--primary); } .brand span { font-size: 1.25rem; font-weight: 800; }
+        .menu-label { font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; margin: 20px 0 10px 10px; }
+        .menu-item { padding: 12px 16px; color: var(--text-muted); border-radius: 8px; cursor: pointer; margin-bottom: 4px; font-weight: 500; display: flex; align-items: center; gap: 12px; text-decoration: none; position: relative; }
+        .menu-item:hover { background: #eef2ff; color: var(--primary); }
+        .menu-item.active { background: var(--primary); color: white; }
+
+        .main-content { flex: 1; padding: 32px; display: flex; flex-direction: column; }
+        .header { display: flex; justify-content: space-between; margin-bottom: 25px; align-items: center; }
+
+        /* FILTROS */
+        .filters-container { background: white; padding: 20px; border-radius: 16px; border: 1px solid var(--border); display: flex; gap: 15px; margin-bottom: 25px; align-items: flex-end; flex-wrap: wrap; }
+        .filter-group { display: flex; flex-direction: column; gap: 5px; }
+        .filter-group label { font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; }
+        .filter-input { padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; outline: none; min-width: 180px; }
+        .btn-filter { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 700; height: 42px; display: flex; align-items: center; gap: 8px; }
+
+        /* TABLA DE RESULTADOS */
+        .table-container { background: var(--surface); border-radius: 16px; border: 1px solid var(--border); overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; padding: 15px 25px; background: #f8fafc; font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; border-bottom: 2px solid var(--border); }
+        td { padding: 15px 25px; border-bottom: 1px solid #f1f5f9; font-size: 0.9rem; vertical-align: middle; }
+        
+        .row-report:hover { background: #f8fafc; cursor: pointer; }
+        .score-badge { font-weight: 800; font-size: 1.1rem; }
+        .text-pass { color: var(--success); }
+        .text-fail { color: var(--danger); }
+
+        /* DESPLEGABLE DE DETALLE */
+        .detail-pane { display: none; background: #fafafa; padding: 25px; border-bottom: 1px solid var(--border); border-left: 5px solid var(--warning); }
+        .detail-pane.active { display: table-row; }
+        .error-list { background: #fff1f2; border: 1px solid #fecaca; padding: 15px; border-radius: 12px; }
+        .error-item { color: #991b1b; font-size: 0.85rem; margin-bottom: 5px; list-style: none; display: flex; gap: 10px; }
+
+        .btn-retest { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; padding: 5px 12px; border-radius: 6px; cursor: pointer; font-weight: 700; font-size: 0.75rem; transition: 0.2s; }
+        .btn-retest:hover { background: #991b1b; color: white; }
+        .btn-retest.active { background: var(--success); color: white; border-color: var(--success); }
+
+        .btn-excel { background: #10b981; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 5px; }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <div class="brand"><i class="fas fa-cube"></i><span>Geincos Admin</span></div>
+        <div class="menu-label">Analítica</div>
+        <a href="dashboard.html" class="menu-item"><i class="fas fa-chart-pie"></i> Dashboard</a>
+        <a href="reportes.html" class="menu-item active"><i class="fas fa-file-invoice"></i> Reportes</a>
+        <a href="calidad-ia.html" class="menu-item"><i class="fas fa-check-circle"></i> Calidad IA</a>
+        <a href="resultados-pvp.html" class="menu-item"><i class="fas fa-trophy"></i> Resultados PvP</a>
+        <div class="menu-label">Gestión</div>
+        <a href="postulantes.html" class="menu-item"><i class="fas fa-users"></i> Postulantes</a>
+        <a href="personal-activo.html" class="menu-item"><i class="fas fa-id-badge"></i> Personal Activo</a>
+        <a href="asistencia.html" class="menu-item"><i class="fas fa-calendar-check"></i> Asistencia</a>
+        <a href="materiales.html" class="menu-item"><i class="fas fa-book"></i> Materiales</a>
+        <a href="examenes.html" class="menu-item"><i class="fas fa-clipboard-check"></i> Exámenes</a>
+        <a href="simuladores.html" class="menu-item"><i class="fas fa-gamepad"></i> Simuladores</a>
+        <a href="ia-roleplay.html" class="menu-item"><i class="fas fa-robot"></i> IA Roleplay</a>
+        <div class="menu-item" style="margin-top:auto; color:var(--danger)" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Cerrar Sesión</div>
+    </div>
+
+    <div class="main-content">
+        <div class="header">
+            <div>
+                <h2>Reporte de Calificaciones y Certificados</h2>
+                <p style="color:var(--text-muted)">Monitoreo de evaluaciones teóricas y gestión de oportunidades.</p>
+            </div>
+            <button class="btn-excel" onclick="exportReports()"><i class="fas fa-file-excel"></i> Exportar Todo</button>
+        </div>
+
+        <div class="filters-container">
+            <div class="filter-group"><label>Buscar Asesor</label><input type="text" id="repSearch" class="filter-input" placeholder="Nombre o DNI..."></div>
+            <div class="filter-group"><label>Fecha Desde</label><input type="date" id="repStart" class="filter-input"></div>
+            <div class="filter-group"><label>Fecha Hasta</label><input type="date" id="repEnd" class="filter-input"></div>
+            <button class="btn-filter" onclick="loadReports()"><i class="fas fa-search"></i> Consultar</button>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 40px;"></th>
+                        <th>Fecha</th>
+                        <th>Asesor</th>
+                        <th>Curso / Examen</th>
+                        <th>Nota</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="tbReports">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const SB_URL = 'https://xgvfcmadsprjyljtpooo.supabase.co';
+        const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhndmZjbWFkc3ByanlsanRwb29vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY1ODMxNjAsImV4cCI6MjA4MjE1OTE2MH0.XYBbKFE17PfyYMn2SNL5UJrCQmDRbimTQO0jpbX1Zd0';
+        const sbClient = supabase.createClient(SB_URL, SB_KEY);
+        
+        let reportDataList = [];
+
+        window.onload = () => {
+            const date = new Date();
+            document.getElementById('repStart').value = new Date(date.getFullYear(), date.getMonth(), 1).toISOString().split('T')[0];
+            document.getElementById('repEnd').value = new Date().toISOString().split('T')[0];
+            loadReports();
+        };
+
+        function logout() { localStorage.clear(); window.location.href='index.html'; }
+
+        async function loadReports() {
+            const start = document.getElementById('repStart').value;
+            const end = document.getElementById('repEnd').value;
+            const search = document.getElementById('repSearch').value.toLowerCase();
+
+            let query = sbClient.from('evaluaciones').select('*').gte('created_at', start).lte('created_at', end + 'T23:59:59');
+            
+            const { data, error } = await query.order('created_at', { ascending: false });
+            if (error) return console.error(error);
+
+            reportDataList = data || [];
+            renderReports(search);
+        }
+
+        function renderReports(filterText) {
+            let h = '';
+            const filtered = reportDataList.filter(r => 
+                r.usuario.toLowerCase().includes(filterText) || 
+                r.curso.toLowerCase().includes(filterText)
+            );
+
+            filtered.forEach(r => {
+                const isPass = r.nota >= 14;
+                const scoreCls = isPass ? 'text-pass' : 'text-fail';
+                const retestBtnCls = r.retest_active ? 'btn-retest active' : 'btn-retest';
+                const retestTxt = r.retest_active ? '<i class="fas fa-check"></i> Habilitado' : 'Habilitar Retest';
+
+                h += `
+                <tr class="row-report" onclick="toggleDetail('${r.id}')">
+                    <td style="text-align:center"><i class="fas fa-chevron-right" id="icon-${r.id}" style="transition:0.3s"></i></td>
+                    <td>${new Date(r.created_at).toLocaleDateString()}</td>
+                    <td><b>${r.usuario}</b></td>
+                    <td>${r.curso}</td>
+                    <td class="score-badge ${scoreCls}">${r.nota}</td>
+                    <td>
+                        <button class="${retestBtnCls}" onclick="toggleRetest(event, '${r.id}', ${r.retest_active})">
+                            ${retestTxt}
+                        </button>
+                    </td>
+                </tr>
+                <tr id="detail-${r.id}" class="detail-pane">
+                    <td colspan="6">
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+                            <div class="error-list">
+                                <h4 style="margin-bottom:10px; color:#991b1b"><i class="fas fa-times-circle"></i> Preguntas con Error</h4>
+                                <ul>
+                                    ${formatErrors(r.detalle)}
+                                </ul>
+                            </div>
+                            <div style="background:white; padding:15px; border-radius:12px; border:1px solid #eee">
+                                <h4><i class="fas fa-award"></i> Certificación</h4>
+                                <p style="font-size:0.85rem; color:var(--text-muted); margin-top:10px">
+                                    Estado: <b>${isPass ? 'APROBADO' : 'PENDIENTE'}</b><br>
+                                    Intentos realizados: <b>1</b>
+                                </p>
+                                ${isPass ? `<small style="color:var(--success)">Certificado generado automáticamente.</small>` : ''}
+                            </div>
+                        </div>
+                    </td>
+                </tr>`;
+            });
+
+            document.getElementById('tbReports').innerHTML = h || '<tr><td colspan="6" style="text-align:center; padding:30px">No hay registros con los filtros actuales.</td></tr>';
+        }
+
+        function formatErrors(txt) {
+            if (!txt) return '<li class="error-item">No hay detalles de errores registrados.</li>';
+            const parts = txt.split(' ||| ').filter(p => p.includes('INCORRECTO'));
+            if (parts.length === 0) return '<li class="error-item" style="color:var(--success)">¡Examen perfecto! Sin errores.</li>';
+            
+            return parts.map(p => `<li class="error-item"><i class="fas fa-minus"></i> ${p.replace(' - INCORRECTO', '')}</li>`).join('');
+        }
+
+        function toggleDetail(id) {
+            const el = document.getElementById(`detail-${id}`);
+            const icon = document.getElementById(`icon-${id}`);
+            const isActive = el.classList.contains('active');
+            
+            if(isActive) {
+                el.classList.remove('active');
+                icon.style.transform = 'rotate(0deg)';
+            } else {
+                el.classList.add('active');
+                icon.style.transform = 'rotate(90deg)';
+            }
+        }
+
+        async function toggleRetest(event, id, currentStatus) {
+            event.stopPropagation(); // Evita que se abra el detalle al hacer clic en el botón
+            const newStatus = !currentStatus;
+            const { error } = await sbClient.from('evaluaciones').update({ retest_active: newStatus }).eq('id', id);
+            
+            if (!error) {
+                loadReports(); // Recarga la lista para mostrar el cambio
+            }
+        }
+
+        function exportReports() {
+            if(reportDataList.length === 0) return alert("No hay datos");
+            const data = reportDataList.map(r => ({
+                Fecha: new Date(r.created_at).toLocaleDateString(),
+                Asesor: r.usuario,
+                Examen: r.curso,
+                Nota: r.nota,
+                Estado: r.nota >= 14 ? 'Aprobado' : 'Desaprobado',
+                Retest: r.retest_active ? 'Habilitado' : 'Cerrado'
+            }));
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Calificaciones");
+            XLSX.writeFile(wb, "Reporte_Evaluaciones.xlsx");
+        }
+    </script>
+</body>
+</html>

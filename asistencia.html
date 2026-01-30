@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Geincos Admin | Control de Asistencia</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <style>
+        :root { 
+            --primary: #4f46e5; --bg-body: #f3f4f6; --surface: #ffffff; 
+            --text-main: #1e293b; --text-muted: #64748b; --success: #10b981; 
+            --danger: #ef4444; --warning: #f59e0b; --border: #e2e8f0; 
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        body { background-color: var(--bg-body); color: var(--text-main); display: flex; min-height: 100vh; overflow: hidden; }
+        
+        .sidebar { width: 260px; background: var(--surface); border-right: 1px solid var(--border); padding: 24px; display: flex; flex-direction: column; z-index: 50; flex-shrink: 0; position: sticky; top: 0; height: 100vh; }
+        .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 40px; }
+        .brand i { font-size: 1.5rem; color: var(--primary); } .brand span { font-size: 1.25rem; font-weight: 800; }
+        .menu-label { font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; margin: 20px 0 10px 10px; }
+        .menu-item { padding: 12px 16px; color: var(--text-muted); border-radius: 8px; cursor: pointer; margin-bottom: 4px; font-weight: 500; display: flex; align-items: center; gap: 12px; text-decoration: none; }
+        .menu-item:hover { background: #eef2ff; color: var(--primary); }
+        .menu-item.active { background: var(--primary); color: white; }
+
+        .main-content { flex: 1; padding: 32px; overflow-y: auto; display: flex; flex-direction: column; }
+        .header { display: flex; justify-content: space-between; margin-bottom: 25px; align-items: center; }
+
+        .controls-container { background: white; padding: 20px; border-radius: 16px; border: 1px solid var(--border); display: flex; gap: 15px; margin-bottom: 25px; align-items: flex-end; flex-wrap: wrap; }
+        .control-group { display: flex; flex-direction: column; gap: 5px; }
+        .control-group label { font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; }
+        .filter-input { padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; outline: none; min-width: 180px; }
+        .btn-action { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 700; height: 42px; display: flex; align-items: center; gap: 8px; }
+
+        .table-container { background: var(--surface); border-radius: 16px; border: 1px solid var(--border); overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; padding: 15px 25px; background: #f8fafc; font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; border-bottom: 2px solid var(--border); }
+        td { padding: 15px 25px; border-bottom: 1px solid #f1f5f9; font-size: 0.9rem; }
+        
+        .status-select { padding: 5px 10px; border-radius: 8px; border: 1px solid var(--border); font-weight: 600; font-size: 0.85rem; outline: none; }
+        .status-presente { color: var(--success); border-color: var(--success); background: #f0fdf4; }
+        .status-tarde { color: var(--warning); border-color: var(--warning); background: #fffbeb; }
+        .status-falta { color: var(--danger); border-color: var(--danger); background: #fef2f2; }
+
+        .btn-save-row { background: var(--primary); color: white; border: none; width: 32px; height: 32px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+        .btn-save-all { background: var(--success); color: white; border: none; padding: 12px 25px; border-radius: 10px; cursor: pointer; font-weight: 700; margin-top: 20px; align-self: flex-end; display: flex; align-items: center; gap: 10px; }
+
+        /* NOTIFICACIONES TOAST */
+        #toast { position: fixed; top: 20px; right: 20px; background: #1e293b; color: white; padding: 16px 24px; border-radius: 12px; display: none; z-index: 2000; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); animation: slideIn 0.3s ease; align-items: center; gap: 12px; }
+        @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+    </style>
+</head>
+<body>
+
+    <div id="toast"><i class="fas fa-check-circle" style="color:var(--success)"></i> <span id="toastMsg">Asistencia guardada</span></div>
+
+    <div class="sidebar">
+        <div class="brand"><i class="fas fa-cube"></i><span>Geincos Admin</span></div>
+        <div class="menu-label">Analítica</div>
+        <a href="dashboard.html" class="menu-item"><i class="fas fa-chart-pie"></i> Dashboard</a>
+        <a href="reportes.html" class="menu-item"><i class="fas fa-file-invoice"></i> Reportes</a>
+        <a href="calidad-ia.html" class="menu-item"><i class="fas fa-check-circle"></i> Calidad IA</a>
+        <div class="menu-label">Gestión</div>
+        <a href="postulantes.html" class="menu-item"><i class="fas fa-users"></i> Postulantes</a>
+        <a href="personal-activo.html" class="menu-item"><i class="fas fa-id-badge"></i> Personal Activo</a>
+        <a href="asistencia.html" class="menu-item active"><i class="fas fa-calendar-check"></i> Asistencia</a>
+        <a href="materiales.html" class="menu-item"><i class="fas fa-book"></i> Materiales</a>
+        <a href="examenes.html" class="menu-item"><i class="fas fa-clipboard-check"></i> Exámenes</a>
+        <a href="simuladores.html" class="menu-item"><i class="fas fa-gamepad"></i> Simuladores</a>
+        <a href="ia-roleplay.html" class="menu-item"><i class="fas fa-robot"></i> IA Roleplay</a>
+        <div class="menu-item" style="margin-top:auto; color:var(--danger)" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Cerrar Sesión</div>
+    </div>
+
+    <div class="main-content">
+        <div class="header">
+            <div>
+                <h2>Control de Asistencia Diaria</h2>
+                <p style="color:var(--text-muted)">Monitoreo de puntualidad en tiempo real.</p>
+            </div>
+        </div>
+
+        <div class="controls-container">
+            <div class="control-group"><label>Fecha</label><input type="date" id="attDate" class="filter-input"></div>
+            <div class="control-group"><label>Grupo</label><select id="attGroup" class="filter-input" onchange="loadAttendanceList()"><option value="">Cargando...</option></select></div>
+            <button class="btn-action" onclick="loadAttendanceList()"><i class="fas fa-search"></i> Cargar Grupo</button>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr><th>DNI</th><th>Nombre Completo</th><th>Estado</th><th>Observación</th><th style="width: 50px;"></th></tr>
+                </thead>
+                <tbody id="tbAttendance">
+                    <tr><td colspan="5" style="text-align:center; padding:30px; color:#999">Selecciona un grupo para registrar asistencia.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <button class="btn-save-all" id="btnSaveAttendance" onclick="saveAttendanceData()" style="display:none">
+            <i class="fas fa-cloud-upload-alt"></i> Guardar Toda la Lista
+        </button>
+    </div>
+
+    <script>
+        const SB_URL = 'https://xgvfcmadsprjyljtpooo.supabase.co';
+        const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhndmZjbWFkc3ByanlsanRwb29vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY1ODMxNjAsImV4cCI6MjA4MjE1OTE2MH0.XYBbKFE17PfyYMn2SNL5UJrCQmDRbimTQO0jpbX1Zd0';
+        const sbClient = supabase.createClient(SB_URL, SB_KEY);
+
+        window.onload = async () => {
+            document.getElementById('attDate').value = new Date().toISOString().split('T')[0];
+            await loadGroups();
+        };
+
+        function logout() { localStorage.clear(); window.location.href='index.html'; }
+        function showNotification(msg) { const t = document.getElementById('toast'); document.getElementById('toastMsg').innerText = msg; t.style.display = 'flex'; setTimeout(() => t.style.display = 'none', 3000); }
+
+        async function loadGroups() {
+            const { data } = await sbClient.from('usuarios').select('etiqueta').neq('etiqueta', null);
+            const groups = [...new Set(data.map(u => u.etiqueta))].sort();
+            const sel = document.getElementById('attGroup');
+            sel.innerHTML = '<option value="">-- Selecciona --</option>';
+            groups.forEach(g => sel.innerHTML += `<option value="${g}">${g}</option>`);
+        }
+
+        async function loadAttendanceList() {
+            const group = document.getElementById('attGroup').value, date = document.getElementById('attDate').value;
+            if(!group || !date) return;
+            const { data: users } = await sbClient.from('usuarios').select('usuario, correo, dni').eq('etiqueta', group);
+            const { data: existing } = await sbClient.from('asistencias').select('*').eq('fecha', date);
+            let h = '';
+            users.forEach(u => {
+                const att = existing ? existing.find(e => e.usuario === u.usuario) : null;
+                const status = att ? att.estado : 'Presente', obs = att ? att.observacion : '';
+                h += `<tr id="row-${u.usuario}">
+                    <td>${u.dni}</td><td><b>${u.correo || u.usuario}</b></td>
+                    <td><select class="status-select ${getStatusClass(status)}" onchange="updateStatusStyle(this)">
+                        <option value="Presente" ${status === 'Presente' ? 'selected' : ''}>Presente</option>
+                        <option value="Tarde" ${status === 'Tarde' ? 'selected' : ''}>Tarde</option>
+                        <option value="Falta" ${status === 'Falta' ? 'selected' : ''}>Falta</option>
+                    </select></td>
+                    <td><input type="text" class="filter-input obs-input" style="width:100%" value="${obs}"></td>
+                    <td><button class="btn-save-row" onclick="saveSingleRow('${u.usuario}')"><i class="fas fa-save"></i></button></td>
+                </tr>`;
+            });
+            document.getElementById('tbAttendance').innerHTML = h || '<tr><td colspan="5">No hay usuarios.</td></tr>';
+            document.getElementById('btnSaveAttendance').style.display = h ? 'flex' : 'none';
+        }
+
+        function getStatusClass(s) { return s === 'Presente' ? 'status-presente' : (s === 'Tarde' ? 'status-tarde' : 'status-falta'); }
+        function updateStatusStyle(sel) { sel.className = 'status-select ' + getStatusClass(sel.value); }
+
+        async function saveSingleRow(usuario) {
+            const date = document.getElementById('attDate').value, row = document.getElementById(`row-${usuario}`);
+            const estado = row.querySelector('.status-select').value, obs = row.querySelector('.obs-input').value, btn = row.querySelector('.btn-save-row');
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            const { error } = await sbClient.from('asistencias').upsert({ usuario, fecha: date, estado, observacion: obs }, { onConflict: 'usuario, fecha' });
+            if(!error) { 
+                btn.innerHTML = '<i class="fas fa-check"></i>'; btn.style.background = 'var(--success)'; 
+                showNotification("Registro individual guardado");
+                setTimeout(() => { btn.innerHTML = '<i class="fas fa-save"></i>'; btn.style.background = 'var(--primary)'; }, 2000);
+            }
+        }
+
+        async function saveAttendanceData() {
+            const date = document.getElementById('attDate').value, rows = document.querySelectorAll('#tbAttendance tr[id^="row-"]'), btn = document.getElementById('btnSaveAttendance');
+            btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando toda la lista...';
+            for(const row of rows) {
+                const u = row.id.replace('row-', ''), st = row.querySelector('.status-select').value, ob = row.querySelector('.obs-input').value;
+                await sbClient.from('asistencias').upsert({ usuario: u, fecha: date, estado: st, observacion: ob }, { onConflict: 'usuario, fecha' });
+            }
+            showNotification("¡Asistencia grupal guardada con éxito!");
+            btn.disabled = false; btn.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> Guardar Toda la Lista';
+        }
+    </script>
+</body>
+</html>

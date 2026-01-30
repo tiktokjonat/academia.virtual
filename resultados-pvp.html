@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Geincos Admin | Reporte Detallado PvP</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
+
+    <style>
+        :root { 
+            --primary: #4f46e5; --bg-body: #f3f4f6; --surface: #ffffff; 
+            --text-main: #1e293b; --text-muted: #64748b; --success: #10b981; 
+            --danger: #ef4444; --warning: #f59e0b; --border: #e2e8f0; 
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        body { background-color: var(--bg-body); color: var(--text-main); display: flex; min-height: 100vh; }
+        
+        .sidebar { width: 260px; background: var(--surface); border-right: 1px solid var(--border); padding: 24px; display: flex; flex-direction: column; z-index: 50; flex-shrink: 0; position: sticky; top: 0; height: 100vh; }
+        .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 40px; }
+        .brand i { font-size: 1.5rem; color: var(--primary); } .brand span { font-size: 1.25rem; font-weight: 800; }
+        .menu-label { font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; margin: 20px 0 10px 10px; }
+        .menu-item { padding: 12px 16px; color: var(--text-muted); border-radius: 8px; cursor: pointer; margin-bottom: 4px; font-weight: 500; display: flex; align-items: center; gap: 12px; text-decoration: none; position: relative; }
+        .menu-item:hover { background: #eef2ff; color: var(--primary); }
+        .menu-item.active { background: var(--primary); color: white; }
+
+        .main-content { flex: 1; padding: 32px; display: flex; flex-direction: column; }
+        .header { display: flex; justify-content: space-between; margin-bottom: 25px; align-items: center; }
+
+        .filters-container { background: white; padding: 20px; border-radius: 16px; border: 1px solid var(--border); display: flex; gap: 15px; margin-bottom: 25px; align-items: flex-end; flex-wrap: wrap; }
+        .filter-group { display: flex; flex-direction: column; gap: 5px; }
+        .filter-group label { font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; }
+        .filter-input { padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; outline: none; min-width: 180px; }
+        .btn-filter { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 700; height: 42px; display: flex; align-items: center; gap: 8px; }
+
+        .table-container { background: var(--surface); border-radius: 16px; border: 1px solid var(--border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 50px; }
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; padding: 15px 25px; background: #f8fafc; font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; border-bottom: 2px solid var(--border); }
+        td { padding: 15px 25px; border-bottom: 1px solid #f1f5f9; font-size: 0.9rem; }
+        
+        .row-duel:hover { background: #f8fafc; cursor: pointer; }
+        .detail-pane { display: none; background: #fafafa; padding: 30px; border-bottom: 1px solid var(--border); border-left: 5px solid var(--primary); }
+        .detail-pane.active { display: table-row; } /* Cambiado para que respete el flujo de tabla */
+
+        .player-tag { display: inline-flex; align-items: center; gap: 5px; background: #f1f5f9; color: #475569; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; margin: 2px; border: 1px solid #e2e8f0; }
+        .badge-win { background: #dcfce7; color: #166534; padding: 5px 12px; border-radius: 12px; font-size: 0.8rem; font-weight: 800; border: 1px solid #bbf7d0; }
+        .btn-excel { background: #10b981; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 5px; }
+
+        .score-list { list-style: none; margin-top: 15px; }
+        .score-item { display: flex; justify-content: space-between; padding: 12px 15px; background: white; border: 1px solid #e2e8f0; border-radius: 10px; margin-bottom: 8px; align-items: center; }
+        .score-val { background: var(--primary-soft); color: var(--primary); font-weight: 800; padding: 4px 10px; border-radius: 8px; }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <div class="brand"><i class="fas fa-cube"></i><span>Geincos Admin</span></div>
+        <div class="menu-label">Analítica</div>
+        <a href="dashboard.html" class="menu-item"><i class="fas fa-chart-pie"></i> Dashboard</a>
+        <a href="reportes.html" class="menu-item"><i class="fas fa-file-invoice"></i> Reportes</a>
+        <a href="calidad-ia.html" class="menu-item"><i class="fas fa-check-circle"></i> Calidad IA</a>
+        <a href="resultados-pvp.html" class="menu-item active"><i class="fas fa-trophy"></i> Resultados PvP</a>
+        <div class="menu-label">Gestión</div>
+        <a href="postulantes.html" class="menu-item"><i class="fas fa-users"></i> Postulantes</a>
+        <a href="personal-activo.html" class="menu-item"><i class="fas fa-id-badge"></i> Personal Activo</a>
+        <a href="asistencia.html" class="menu-item"><i class="fas fa-calendar-check"></i> Asistencia</a>
+        <a href="materiales.html" class="menu-item"><i class="fas fa-book"></i> Materiales</a>
+        <a href="examenes.html" class="menu-item"><i class="fas fa-clipboard-check"></i> Exámenes</a>
+        <a href="simuladores.html" class="menu-item"><i class="fas fa-gamepad"></i> Simuladores</a>
+        <a href="ia-roleplay.html" class="menu-item"><i class="fas fa-robot"></i> IA Roleplay</a>
+        <div class="menu-item" style="margin-top:auto; color:var(--danger)" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Cerrar Sesión</div>
+    </div>
+
+    <div class="main-content">
+        <div class="header">
+            <div>
+                <h2>Informe Detallado de Duelos PvP</h2>
+                <p style="color:var(--text-muted)">Resultados individuales y colectivos de las competencias.</p>
+            </div>
+            <button class="btn-excel" onclick="exportPvP()"><i class="fas fa-file-excel"></i> Descargar Excel</button>
+        </div>
+
+        <div class="filters-container">
+            <div class="filter-group"><label>Grupo</label><select id="duelGroup" class="filter-input"><option value="">Todos los grupos</option></select></div>
+            <div class="filter-group"><label>Fecha Inicio</label><input type="date" id="duelStart" class="filter-input"></div>
+            <div class="filter-group"><label>Fecha Fin</label><input type="date" id="duelEnd" class="filter-input"></div>
+            <button class="btn-filter" onclick="loadDuelData()"><i class="fas fa-search"></i> Generar Reporte</button>
+        </div>
+
+        <div class="table-container">
+            <table id="pvpMainTable">
+                <thead>
+                    <tr>
+                        <th style="width: 40px;"></th>
+                        <th>Fecha</th>
+                        <th>Grupo</th>
+                        <th>Participantes</th>
+                        <th>Ganador de Sala</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody id="tbDuels"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const SB_URL = 'https://xgvfcmadsprjyljtpooo.supabase.co';
+        const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhndmZjbWFkc3ByanlsanRwb29vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY1ODMxNjAsImV4cCI6MjA4MjE1OTE2MH0.XYBbKFE17PfyYMn2SNL5UJrCQmDRbimTQO0jpbX1Zd0';
+        const sbClient = supabase.createClient(SB_URL, SB_KEY);
+        
+        let allDuelsData = [];
+
+        window.onload = async () => {
+            const date = new Date();
+            document.getElementById('duelStart').value = new Date(date.getFullYear(), date.getMonth(), 1).toISOString().split('T')[0];
+            document.getElementById('duelEnd').value = new Date().toISOString().split('T')[0];
+            await loadGroups();
+            loadDuelData();
+        };
+
+        function logout() { localStorage.clear(); window.location.href='index.html'; }
+
+        async function loadGroups() {
+            const { data } = await sbClient.from('usuarios').select('etiqueta').neq('etiqueta', null);
+            const groups = [...new Set(data.map(u => u.etiqueta))].sort();
+            const sel = document.getElementById('duelGroup');
+            groups.forEach(g => sel.innerHTML += `<option value="${g}">${g}</option>`);
+        }
+
+        async function loadDuelData() {
+            const group = document.getElementById('duelGroup').value;
+            const start = document.getElementById('duelStart').value;
+            const end = document.getElementById('duelEnd').value;
+
+            let query = sbClient.from('duelos').select('*').gte('created_at', start).lte('created_at', end + 'T23:59:59');
+            if(group) query = query.eq('grupo', group);
+            
+            const { data, error } = await query.order('created_at', {ascending: false});
+            if(error) return console.error(error);
+            
+            allDuelsData = data || [];
+            renderDuels();
+        }
+
+        function renderDuels() {
+            let h = '';
+            allDuelsData.forEach(d => {
+                const players = d.jugadores || [];
+                const puntajes = d.puntajes || {};
+                
+                let winner = "Empate / Sin puntos";
+                let max = -1;
+                Object.entries(puntajes).forEach(([u, s]) => { 
+                    if(s > max) { max = s; winner = u; } 
+                });
+                if(max <= 0) winner = "Sin ganador";
+
+                h += `
+                <tr class="row-duel" onclick="toggleDetail('${d.id}')">
+                    <td style="text-align:center"><i class="fas fa-chevron-right" id="icon-${d.id}" style="transition:0.3s"></i></td>
+                    <td>${new Date(d.created_at).toLocaleDateString()}</td>
+                    <td><span style="font-weight:700; color:var(--primary)">${d.grupo}</span></td>
+                    <td>${players.map(p => `<span class="player-tag">${p}</span>`).join('')}</td>
+                    <td><span class="badge-win"><i class="fas fa-crown"></i> ${winner}</span></td>
+                    <td><span style="color:${d.estado === 'FINALIZADO' ? 'var(--success)' : 'var(--warning)'}; font-weight:700">${d.estado}</span></td>
+                </tr>
+                <tr id="detail-${d.id}" class="detail-pane">
+                    <td colspan="6">
+                        <div style="display:grid; grid-template-columns: 1.5fr 1fr; gap:40px;">
+                            <div>
+                                <h4 style="margin-bottom:15px; border-bottom:1px solid #eee; padding-bottom:10px"><i class="fas fa-users"></i> Desempeño por Participante</h4>
+                                <ul class="score-list">
+                                    ${Object.entries(puntajes).map(([u, s]) => `
+                                        <li class="score-item">
+                                            <span><b>${u}</b></span>
+                                            <div>
+                                                <span style="margin-right:15px; color:var(--text-muted); font-size:0.8rem">Efectividad: ${Math.round((s/5)*100)}%</span>
+                                                <span class="score-val">${s} / 5</span>
+                                            </div>
+                                        </li>
+                                    `).join('')}
+                                </ul>
+                            </div>
+                            <div style="background:#fff; padding:20px; border-radius:15px; border:1px solid #eee">
+                                <h4><i class="fas fa-info-circle"></i> Resumen de Sesión</h4>
+                                <div style="margin-top:15px; font-size:0.9rem; line-height:2">
+                                    <p>Sala creada por: <b style="color:var(--primary)">${d.creador}</b></p>
+                                    <p>ID de sala: <code>${d.id.substring(0,12)}</code></p>
+                                    <p>Preguntas respondidas: <b>${d.indice_pregunta + 1}</b></p>
+                                    <p>Participación Total: <b>${players.length} asesores</b></p>
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>`;
+            });
+            document.getElementById('tbDuels').innerHTML = h || '<tr><td colspan="6" style="text-align:center; padding:30px;">No hay registros disponibles.</td></tr>';
+        }
+
+        function toggleDetail(id) {
+            const el = document.getElementById(`detail-${id}`);
+            const icon = document.getElementById(`icon-${id}`);
+            const isActive = el.classList.contains('active');
+            
+            // Cerrar otros solo si deseas colapsar el resto
+            // document.querySelectorAll('.detail-pane').forEach(p => p.classList.remove('active'));
+
+            if(isActive) {
+                el.classList.remove('active');
+                icon.style.transform = 'rotate(0deg)';
+            } else {
+                el.classList.add('active');
+                icon.style.transform = 'rotate(90deg)';
+            }
+        }
+
+        function exportPvP() {
+            if(allDuelsData.length === 0) return alert("No hay datos para exportar");
+            const data = [];
+            
+            allDuelsData.forEach(d => {
+                Object.entries(d.puntajes || {}).forEach(([user, score]) => {
+                    data.push({
+                        "Fecha": new Date(d.created_at).toLocaleDateString(),
+                        "Grupo": d.grupo,
+                        "Sala Creada Por": d.creador,
+                        "Asesor Participante": user,
+                        "Respuestas Correctas": score,
+                        "Preguntas Totales": d.indice_pregunta + 1,
+                        "Efectividad %": Math.round((score/(d.indice_pregunta + 1))*100) + "%",
+                        "Estado": d.estado
+                    });
+                });
+            });
+            
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Duelos_Detalle");
+            XLSX.writeFile(wb, "Reporte_General_PvP.xlsx");
+        }
+    </script>
+</body>
+</html>

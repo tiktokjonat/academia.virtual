@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Geincos Admin | Calidad IA</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <style>
+        :root { 
+            --primary: #4f46e5; --bg-body: #f3f4f6; --surface: #ffffff; 
+            --text-main: #1e293b; --text-muted: #64748b; --success: #10b981; 
+            --danger: #ef4444; --warning: #f59e0b; --border: #e2e8f0; 
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        body { background-color: var(--bg-body); color: var(--text-main); display: flex; min-height: 100vh; }
+        
+        /* SIDEBAR COMPLETA */
+        .sidebar { width: 260px; background: var(--surface); border-right: 1px solid var(--border); padding: 24px; display: flex; flex-direction: column; z-index: 50; flex-shrink: 0; position: sticky; top: 0; height: 100vh; }
+        .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 40px; }
+        .brand i { font-size: 1.5rem; color: var(--primary); } .brand span { font-size: 1.25rem; font-weight: 800; }
+        .menu-label { font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; margin: 20px 0 10px 10px; }
+        .menu-item { padding: 12px 16px; color: var(--text-muted); border-radius: 8px; cursor: pointer; margin-bottom: 4px; font-weight: 500; display: flex; align-items: center; gap: 12px; text-decoration: none; position: relative; }
+        .menu-item:hover { background: #eef2ff; color: var(--primary); }
+        .menu-item.active { background: var(--primary); color: white; }
+
+        .main-content { flex: 1; padding: 32px; display: flex; flex-direction: column; }
+        .header { display: flex; justify-content: space-between; margin-bottom: 25px; align-items: center; }
+
+        /* TABLA DE RESULTADOS */
+        .table-container { background: var(--surface); border-radius: 16px; border: 1px solid var(--border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 50px; }
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; padding: 15px 25px; background: #f8fafc; font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; border-bottom: 2px solid var(--border); }
+        td { padding: 15px 25px; border-bottom: 1px solid #f1f5f9; font-size: 0.9rem; vertical-align: middle; }
+        
+        .row-eval:hover { background: #f8fafc; cursor: pointer; }
+        .score-badge { padding: 6px 14px; border-radius: 12px; font-weight: 800; font-size: 1rem; display: inline-block; }
+        .bg-pass { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+        .bg-fail { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+
+        /* DESPLEGABLE DE FEEDBACK */
+        .detail-pane { display: none; background: #fafafa; padding: 30px; border-bottom: 1px solid var(--border); border-left: 5px solid var(--primary); }
+        .detail-pane.active { display: table-row; }
+        
+        .fb-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .fb-card { padding: 20px; border-radius: 12px; border: 1px solid transparent; }
+        .fb-pass { background: #f0fdf4; border-color: #bbf7d0; color: #14532d; }
+        .fb-fail { background: #fef2f2; border-color: #fecaca; color: #7f1d1d; }
+        
+        .btn-primary { background: var(--primary); color: white; padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+
+        /* MODAL CONFIG */
+        .modal-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(15, 23, 42, 0.6); z-index: 1000; display: none; justify-content: center; align-items: center; backdrop-filter: blur(4px); }
+        .modal-box { background: white; width: 850px; max-width: 95%; padding: 30px; border-radius: 20px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); max-height: 90vh; overflow-y: auto; }
+        .criteria-row { display: grid; grid-template-columns: 1fr 2fr 0.5fr 40px; gap: 10px; margin-bottom: 10px; background: #f8fafc; padding: 10px; border-radius: 8px; align-items: center; }
+        .form-control { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; outline: none; }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <div class="brand"><i class="fas fa-cube"></i><span>Geincos Admin</span></div>
+        <div class="menu-label">Analítica</div>
+        <a href="dashboard.html" class="menu-item"><i class="fas fa-chart-pie"></i> Dashboard</a>
+        <a href="reportes.html" class="menu-item"><i class="fas fa-file-invoice"></i> Reportes</a>
+        <a href="calidad-ia.html" class="menu-item active"><i class="fas fa-check-circle"></i> Calidad IA</a>
+        <a href="resultados-pvp.html" class="menu-item"><i class="fas fa-trophy"></i> Resultados PvP</a>
+        <div class="menu-label">Gestión</div>
+        <a href="postulantes.html" class="menu-item"><i class="fas fa-users"></i> Postulantes</a>
+        <a href="personal-activo.html" class="menu-item"><i class="fas fa-id-badge"></i> Personal Activo</a>
+        <a href="asistencia.html" class="menu-item"><i class="fas fa-calendar-check"></i> Asistencia</a>
+        <a href="materiales.html" class="menu-item"><i class="fas fa-book"></i> Materiales</a>
+        <a href="examenes.html" class="menu-item"><i class="fas fa-clipboard-check"></i> Exámenes</a>
+        <a href="simuladores.html" class="menu-item"><i class="fas fa-gamepad"></i> Simuladores</a>
+        <a href="ia-roleplay.html" class="menu-item"><i class="fas fa-robot"></i> IA Roleplay</a>
+        <div class="menu-item" style="margin-top:auto; color:var(--danger)" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Cerrar Sesión</div>
+    </div>
+
+    <div class="main-content">
+        <div class="header">
+            <div>
+                <h2>Resultados de Calidad IA</h2>
+                <p style="color:var(--text-muted)">Haz clic en un registro para ver el análisis detallado de la IA.</p>
+            </div>
+            <button class="btn-primary" onclick="openConfigCalidad()"><i class="fas fa-cog"></i> Configurar Criterios</button>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 40px;"></th>
+                        <th>Fecha y Hora</th>
+                        <th>Asesor Evaluado</th>
+                        <th>Escenario</th>
+                        <th>Nota IA</th>
+                    </tr>
+                </thead>
+                <tbody id="tbCalidad">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modalConfigCalidad">
+        <div class="modal-box">
+            <h3>Configuración de Evaluación IA</h3>
+            <div class="form-group" style="background:#eef2ff; padding:20px; border-radius:12px; margin-bottom:20px">
+                <label style="font-weight:700">Seleccionar Escenario:</label>
+                <select id="configScenarioSelect" class="form-control" onchange="loadCriteriaForScenario()" style="margin-top:10px">
+                    <option value="">Cargando escenarios...</option>
+                </select>
+            </div>
+            <div id="criteriaList"></div>
+            <button class="btn-primary" style="width:100%; border:1px dashed var(--primary); background:none; color:var(--primary); margin-top:15px" onclick="addCriteriaRow()">+ Agregar Criterio</button>
+            <div style="margin-top:25px; text-align:right; border-top:1px solid #eee; padding-top:20px">
+                <button class="btn-primary" style="background:var(--text-muted)" onclick="closeModals()">Cancelar</button>
+                <button class="btn-primary" onclick="saveConfigCalidad()" style="display:inline-flex; margin-left:10px">Guardar Cambios</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SB_URL = 'https://xgvfcmadsprjyljtpooo.supabase.co';
+        const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhndmZjbWFkc3ByanlsanRwb29vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY1ODMxNjAsImV4cCI6MjA4MjE1OTE2MH0.XYBbKFE17PfyYMn2SNL5UJrCQmDRbimTQO0jpbX1Zd0';
+        const sbClient = supabase.createClient(SB_URL, SB_KEY);
+
+        window.onload = () => { loadCalidadResults(); loadScenarioOptions(); };
+
+        function logout() { localStorage.clear(); window.location.href='index.html'; }
+        function closeModals() { document.querySelectorAll('.modal-overlay').forEach(m => m.style.display = 'none'); }
+
+        async function loadScenarioOptions() {
+            const { data } = await sbClient.from('roleplay_scenarios').select('id, titulo');
+            const sel = document.getElementById('configScenarioSelect');
+            sel.innerHTML = '<option value="">-- Selecciona --</option>';
+            if(data) data.forEach(s => sel.innerHTML += `<option value="${s.id}">${s.titulo}</option>`);
+        }
+
+        async function loadCalidadResults() {
+            const { data, error } = await sbClient.from('sesiones_roleplay').select('*').order('created_at', { ascending: false });
+            if (error) return console.error(error);
+
+            let h = '';
+            data.forEach(r => {
+                const isPass = r.puntaje_total >= 70;
+                const scoreCls = isPass ? 'bg-pass' : 'bg-fail';
+                const fb = r.detalle_json || {};
+
+                h += `
+                <tr class="row-eval" onclick="toggleDetail('${r.id}')">
+                    <td style="text-align:center"><i class="fas fa-chevron-right" id="icon-${r.id}" style="transition:0.3s"></i></td>
+                    <td>${new Date(r.created_at).toLocaleString()}</td>
+                    <td><b>${r.usuario}</b></td>
+                    <td><span style="color:var(--primary); font-weight:700">${r.escenario}</span></td>
+                    <td><span class="score-badge ${scoreCls}">${r.puntaje_total}%</span></td>
+                </tr>
+                <tr id="detail-${r.id}" class="detail-pane">
+                    <td colspan="5">
+                        <div class="fb-grid">
+                            <div class="fb-card fb-pass">
+                                <strong><i class="fas fa-check-circle"></i> Fortalezas Detectadas</strong>
+                                <ul style="margin:10px 0 0 20px; font-size:0.9rem">
+                                    ${(fb.fortalezas || []).map(f => `<li>${f}</li>`).join('') || '<li>Sin datos</li>'}
+                                </ul>
+                            </div>
+                            <div class="fb-card fb-fail">
+                                <strong><i class="fas fa-exclamation-triangle"></i> Áreas de Mejora</strong>
+                                <ul style="margin:10px 0 0 20px; font-size:0.9rem">
+                                    ${(fb.areas_mejora || []).map(m => `<li>${m}</li>`).join('') || '<li>Sin observaciones</li>'}
+                                </ul>
+                            </div>
+                        </div>
+                    </td>
+                </tr>`;
+            });
+            document.getElementById('tbCalidad').innerHTML = h || '<tr><td colspan="5" style="text-align:center; padding:30px">No hay evaluaciones registradas.</td></tr>';
+        }
+
+        function toggleDetail(id) {
+            const el = document.getElementById(`detail-${id}`);
+            const icon = document.getElementById(`icon-${id}`);
+            const isActive = el.classList.contains('active');
+            
+            if(isActive) {
+                el.classList.remove('active');
+                icon.style.transform = 'rotate(0deg)';
+            } else {
+                el.classList.add('active');
+                icon.style.transform = 'rotate(90deg)';
+            }
+        }
+
+        async function openConfigCalidad() {
+            document.getElementById('criteriaList').innerHTML = '<p style="text-align:center; padding:20px; color:#999">Selecciona un escenario.</p>';
+            document.getElementById('modalConfigCalidad').style.display = 'flex';
+        }
+
+        async function loadCriteriaForScenario() {
+            const sid = document.getElementById('configScenarioSelect').value;
+            const list = document.getElementById('criteriaList');
+            list.innerHTML = '';
+            if(!sid) return;
+
+            const { data } = await sbClient.from('roleplay_scenarios').select('criterios').eq('id', sid).single();
+            if(data && data.criterios) {
+                data.criterios.forEach(c => addCriteriaRow(c.nombre, c.descripcion, c.puntos));
+            }
+        }
+
+        function addCriteriaRow(name = "", desc = "", pts = "") {
+            const list = document.getElementById('criteriaList');
+            if(list.innerText.includes('Selecciona')) list.innerHTML = '';
+            const div = document.createElement('div');
+            div.className = 'criteria-row';
+            div.innerHTML = `
+                <input type="text" class="form-control c-name" value="${name}" placeholder="Criterio">
+                <input type="text" class="form-control c-desc" value="${desc}" placeholder="Instrucción IA">
+                <input type="number" class="form-control c-pts" value="${pts}" placeholder="%">
+                <button style="background:none; border:none; color:var(--danger); cursor:pointer" onclick="this.parentElement.remove()"><i class="fas fa-trash"></i></button>
+            `;
+            list.appendChild(div);
+        }
+
+        async function saveConfigCalidad() {
+            const sid = document.getElementById('configScenarioSelect').value;
+            if(!sid) return alert("Selecciona un escenario.");
+            const rows = document.querySelectorAll('.criteria-row');
+            let newC = [];
+            rows.forEach(r => {
+                const n = r.querySelector('.c-name').value.trim();
+                const d = r.querySelector('.c-desc').value.trim();
+                const p = parseInt(r.querySelector('.c-pts').value) || 0;
+                if(n) newC.push({ nombre: n, descripcion: d, puntos: p });
+            });
+            await sbClient.from('roleplay_scenarios').update({ criterios: newC }).eq('id', sid);
+            alert('Criterios actualizados.');
+            closeModals();
+        }
+    </script>
+</body>
+</html>

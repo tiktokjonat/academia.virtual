@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Geincos Admin | Gestión IA Roleplay</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <style>
+        :root { --primary: #4f46e5; --bg-body: #f3f4f6; --surface: #ffffff; --text-main: #1e293b; --text-muted: #64748b; --success: #10b981; --danger: #ef4444; --warning: #f59e0b; --border: #e2e8f0; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        body { background-color: var(--bg-body); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; }
+        
+        /* SIDEBAR */
+        .sidebar { width: 260px; background: var(--surface); border-right: 1px solid var(--border); padding: 24px; display: flex; flex-direction: column; flex-shrink: 0; z-index: 50; }
+        .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 40px; }
+        .brand span { font-size: 1.25rem; font-weight: 800; color: var(--text-main); }
+        .menu-label { font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; margin: 20px 0 10px 10px; }
+        .menu-item { padding: 12px 16px; color: var(--text-muted); border-radius: 8px; cursor: pointer; margin-bottom: 4px; display: flex; align-items: center; gap: 12px; text-decoration: none; font-weight: 500; }
+        .menu-item:hover { background: #eef2ff; color: var(--primary); }
+        .menu-item.active { background: var(--primary); color: white; }
+
+        .main-content { flex: 1; padding: 32px; overflow-y: auto; display: flex; flex-direction: column; height: 100vh; }
+        .header { display: flex; justify-content: space-between; margin-bottom: 25px; align-items: center; }
+        h2 { font-size: 1.8rem; font-weight: 700; }
+
+        /* GRID DE CARPETAS */
+        .grid-folders { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .folder-card { background: white; padding: 25px; border-radius: 20px; border: 1px solid var(--border); cursor: pointer; transition: 0.3s; text-align: center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+        .folder-card:hover { transform: translateY(-5px); border-color: var(--primary); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+        .folder-icon { font-size: 3rem; color: #6366f1; margin-bottom: 15px; }
+        .folder-name { font-weight: 800; color: var(--text-main); font-size: 1rem; }
+
+        /* VISTA DETALLE */
+        #viewScenariosDetail { display: none; }
+        .table-container { background: white; border-radius: 16px; border: 1px solid var(--border); overflow: hidden; }
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; padding: 15px 20px; background: #f8fafc; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; }
+        td { padding: 15px 20px; border-bottom: 1px solid #f1f5f9; font-size: 0.9rem; }
+        
+        .btn-primary { background: var(--primary); color: white; padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+        .btn-back { background: #f1f5f9; color: var(--text-muted); padding: 8px 15px; border-radius: 8px; border: none; cursor: pointer; margin-bottom: 20px; font-weight: 600; transition: 0.2s; }
+        .btn-icon { width: 32px; height: 32px; border-radius: 6px; border: none; cursor: pointer; color: white; margin-right: 5px; }
+
+        .modal-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(15, 23, 42, 0.6); z-index: 1000; display: none; justify-content: center; align-items: center; backdrop-filter: blur(4px); }
+        .modal-box { background: white; width: 800px; max-width: 95%; padding: 30px; border-radius: 20px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); max-height: 90vh; overflow-y: auto; }
+        .form-group { margin-bottom: 15px; }
+        .form-control { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; outline: none; margin-top: 5px; }
+        .key-row { display: flex; gap: 10px; margin-bottom: 8px; align-items: center; }
+        .btn-remove-key { background: #fee2e2; color: #ef4444; border: none; width: 30px; height: 30px; border-radius: 6px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="brand"><span>Geincos Admin</span></div>
+        <div class="menu-label">Gestión</div>
+        <a href="postulantes.html" class="menu-item"><i class="fas fa-users"></i> Postulantes</a>
+        <a href="personal-activo.html" class="menu-item"><i class="fas fa-id-badge"></i> Personal Activo</a>
+        <a href="asistencia.html" class="menu-item"><i class="fas fa-calendar-check"></i> Asistencia</a>
+        <a href="materiales.html" class="menu-item"><i class="fas fa-book"></i> Materiales</a>
+        <a href="examenes.html" class="menu-item"><i class="fas fa-clipboard-check"></i> Exámenes</a>
+        <a href="simuladores.html" class="menu-item"><i class="fas fa-gamepad"></i> Simuladores</a>
+        <a href="ia-roleplay.html" class="menu-item active"><i class="fas fa-robot"></i> IA Roleplay</a>
+        <div class="menu-item" style="margin-top:auto; color:var(--danger)" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Cerrar Sesión</div>
+    </div>
+
+    <div class="main-content">
+        <div id="sectionFolders">
+            <div class="header">
+                <h2>Módulos de Entrenamiento IA</h2>
+                <button class="btn-primary" onclick="openModal('modalRoleplay', 'create')">+ Nuevo Escenario</button>
+            </div>
+            <div id="viewModuleFolders" class="grid-folders"></div>
+        </div>
+
+        <div id="viewScenariosDetail">
+            <button class="btn-back" onclick="showFolders()"><i class="fas fa-arrow-left"></i> Volver a Módulos</button>
+            <div class="header"><h2 id="moduleTitle">Escenarios</h2></div>
+            <div class="table-container">
+                <table>
+                    <thead><tr><th>Título</th><th>Cliente</th><th>Deuda</th><th>Keys</th><th>Acciones</th></tr></thead>
+                    <tbody id="tbRoleplays"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modalRoleplay">
+        <div class="modal-box">
+            <h3>Gestión de Escenario IA</h3>
+            <input type="hidden" id="rpId">
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px">
+                <div class="form-group"><label>Título del Escenario</label><input id="rpTitulo" class="form-control"></div>
+                <div class="form-group"><label>Módulo / Carpeta</label><input id="rpModulo" class="form-control" placeholder="Ej: Cobranzas"></div>
+            </div>
+            <div class="form-group"><label>Prompt del Sistema</label><textarea id="rpPrompt" class="form-control" rows="4"></textarea></div>
+            
+            <div style="background:#f8fafc; padding:20px; border-radius:12px; border:1px solid #e2e8f0; margin-bottom:20px">
+                <h4 style="margin-bottom:15px; font-size:0.9rem; color:var(--primary)">DATOS DEL CLIENTE</h4>
+                <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px">
+                    <input id="rpCliNombre" class="form-control" placeholder="Nombre">
+                    <input id="rpCliProd" class="form-control" placeholder="Producto">
+                    <input id="rpCliDeuda" class="form-control" placeholder="Deuda">
+                    <input id="rpCliMora" class="form-control" placeholder="Mora">
+                    <input id="rpCliCapital" class="form-control" placeholder="Capital">
+                    <input id="rpCliCampana" class="form-control" placeholder="Campaña">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>API Keys Rotativas (OpenAI)</label>
+                <div id="apiKeysContainer"></div>
+                <button style="width:100%; padding:8px; background:#eef2ff; color:var(--primary); border:1px dashed var(--primary); border-radius:8px; cursor:pointer; margin-top:10px" onclick="addApiKeyField()">+ Agregar Key</button>
+            </div>
+
+            <div style="text-align:right; margin-top:25px; border-top:1px solid #eee; padding-top:20px;">
+                <button class="btn-primary" style="background:#64748b" onclick="closeModals()">Cancelar</button>
+                <button class="btn-primary" onclick="saveRoleplay()" style="margin-left:10px">Guardar Escenario</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SB_URL = 'https://xgvfcmadsprjyljtpooo.supabase.co';
+        const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhndmZjbWFkc3ByanlsanRwb29vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY1ODMxNjAsImV4cCI6MjA4MjE1OTE2MH0.XYBbKFE17PfyYMn2SNL5UJrCQmDRbimTQO0jpbX1Zd0';
+        const sbClient = supabase.createClient(SB_URL, SB_KEY);
+
+        let scenariosByModule = {}, currentFolder = null;
+
+        window.onload = loadData;
+
+        async function loadData() {
+            // Consulta directa a la tabla roleplay_scenarios
+            const { data, error } = await sbClient.from('roleplay_scenarios').select('*');
+            
+            if (error) {
+                console.error("Error cargando escenarios:", error);
+                return;
+            }
+
+            scenariosByModule = {};
+            if(data && data.length > 0) {
+                data.forEach(r => {
+                    // Verificación robusta de la columna modulo
+                    const mod = (r.modulo && r.modulo.trim() !== "") ? r.modulo : 'General';
+                    if(!scenariosByModule[mod]) scenariosByModule[mod] = [];
+                    scenariosByModule[mod].push(r);
+                });
+            }
+            renderFolders();
+        }
+
+        function renderFolders() {
+            let h = '';
+            const modules = Object.keys(scenariosByModule);
+            
+            if (modules.length === 0) {
+                h = '<p style="text-align:center; grid-column:1/-1; padding:40px; color:#999">No hay escenarios configurados en la base de datos.</p>';
+            } else {
+                modules.forEach(mod => {
+                    h += `<div class="folder-card" onclick="openModule('${mod}')">
+                            <i class="fas fa-robot folder-icon"></i>
+                            <div class="folder-name">${mod}</div>
+                            <div style="font-size:0.8rem; color:var(--text-muted); margin-top:5px">${scenariosByModule[mod].length} Escenarios</div>
+                        </div>`;
+                });
+            }
+            
+            document.getElementById('viewModuleFolders').innerHTML = h;
+            document.getElementById('sectionFolders').style.display = 'block';
+            document.getElementById('viewScenariosDetail').style.display = 'none';
+        }
+
+        function openModule(mod) {
+            currentFolder = mod;
+            document.getElementById('sectionFolders').style.display = 'none';
+            document.getElementById('viewScenariosDetail').style.display = 'block';
+            document.getElementById('moduleTitle').innerText = `Módulo: ${mod}`;
+            
+            let h = '';
+            scenariosByModule[mod].forEach(r => {
+                const kCount = r.api_keys ? r.api_keys.length : 0;
+                h += `<tr>
+                    <td><b>${r.titulo}</b></td>
+                    <td>${r.datos_cliente?.nombre || '-'}</td>
+                    <td>${r.datos_cliente?.deuda || '-'}</td>
+                    <td><span style="background:#e0e7ff; padding:2px 8px; border-radius:5px; font-size:0.75rem">${kCount} Keys</span></td>
+                    <td>
+                        <button class="btn-icon" style="background:var(--warning)" onclick="editRoleplay('${r.id}')"><i class="fas fa-pen"></i></button>
+                        <button class="btn-icon" style="background:var(--danger)" onclick="del('${r.id}')"><i class="fas fa-trash"></i></button>
+                    </td>
+                </tr>`;
+            });
+            document.getElementById('tbRoleplays').innerHTML = h;
+        }
+
+        function showFolders() { loadData(); }
+        function logout() { localStorage.clear(); window.location.href='index.html'; }
+
+        function addApiKeyField(val = "") {
+            const container = document.getElementById('apiKeysContainer');
+            const div = document.createElement('div'); div.className = 'key-row';
+            div.innerHTML = `<input type="text" class="form-control key-input" value="${val}" placeholder="sk-..."><button class="btn-remove-key" onclick="this.parentElement.remove()"><i class="fas fa-times"></i></button>`;
+            container.appendChild(div);
+        }
+
+        function openModal(id, mode) {
+            document.getElementById(id).style.display = 'flex';
+            if(mode === 'create') {
+                clearRoleplayForm();
+                if(currentFolder) document.getElementById('rpModulo').value = currentFolder;
+            }
+        }
+
+        function closeModals() { document.querySelectorAll('.modal-overlay').forEach(m => m.style.display = 'none'); }
+
+        async function saveRoleplay() {
+            const keys = [];
+            document.querySelectorAll('.key-input').forEach(i => { if(i.value.trim()) keys.push(i.value.trim()); });
+            
+            const payload = {
+                titulo: document.getElementById('rpTitulo').value,
+                modulo: document.getElementById('rpModulo').value,
+                prompt_sistema: document.getElementById('rpPrompt').value,
+                datos_cliente: {
+                    nombre: document.getElementById('rpCliNombre').value,
+                    producto: document.getElementById('rpCliProd').value,
+                    deuda: document.getElementById('rpCliDeuda').value,
+                    mora: document.getElementById('rpCliMora').value,
+                    capital: document.getElementById('rpCliCapital').value,
+                    campana: document.getElementById('rpCliCampana').value
+                },
+                api_keys: keys
+            };
+
+            const id = document.getElementById('rpId').value;
+            if(id) await sbClient.from('roleplay_scenarios').update(payload).eq('id', id);
+            else await sbClient.from('roleplay_scenarios').insert([payload]);
+
+            closeModals(); loadData();
+        }
+
+        async function editRoleplay(id) {
+            const { data } = await sbClient.from('roleplay_scenarios').select('*').eq('id', id).single();
+            if(data) {
+                document.getElementById('rpId').value = data.id;
+                document.getElementById('rpTitulo').value = data.titulo;
+                document.getElementById('rpModulo').value = data.modulo || '';
+                document.getElementById('rpPrompt').value = data.prompt_sistema;
+                let d = data.datos_cliente || {};
+                document.getElementById('rpCliNombre').value = d.nombre || '';
+                document.getElementById('rpCliProd').value = d.producto || '';
+                document.getElementById('rpCliDeuda').value = d.deuda || '';
+                document.getElementById('rpCliMora').value = d.mora || '';
+                document.getElementById('rpCliCapital').value = d.capital || '';
+                document.getElementById('rpCliCampana').value = d.campana || '';
+                
+                document.getElementById('apiKeysContainer').innerHTML = '';
+                if(data.api_keys) data.api_keys.forEach(k => addApiKeyField(k));
+                else addApiKeyField();
+                
+                openModal('modalRoleplay', 'edit');
+            }
+        }
+
+        async function del(id) { if(confirm('¿Eliminar escenario?')) { await sbClient.from('roleplay_scenarios').delete().eq('id', id); loadData(); } }
+
+        function clearRoleplayForm() {
+            document.getElementById('rpId').value = '';
+            document.getElementById('rpTitulo').value = '';
+            document.getElementById('rpModulo').value = '';
+            document.getElementById('rpPrompt').value = '';
+            document.getElementById('rpCliNombre').value = '';
+            document.getElementById('rpCliProd').value = '';
+            document.getElementById('rpCliDeuda').value = '';
+            document.getElementById('rpCliMora').value = '';
+            document.getElementById('rpCliCapital').value = '';
+            document.getElementById('rpCliCampana').value = '';
+            document.getElementById('apiKeysContainer').innerHTML = '';
+            addApiKeyField();
+        }
+    </script>
+</body>
+</html>
