@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Geincos Admin | Personal Activo</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
+
+    <style>
+        :root { --primary: #4f46e5; --bg-body: #f3f4f6; --surface: #ffffff; --text-main: #1e293b; --text-muted: #64748b; --success: #10b981; --danger: #ef4444; --warning: #f59e0b; --border: #e2e8f0; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        body { background-color: var(--bg-body); color: var(--text-main); display: flex; min-height: 100vh; overflow: hidden; }
+        
+        .sidebar { width: 260px; background: var(--surface); border-right: 1px solid var(--border); padding: 24px; display: flex; flex-direction: column; flex-shrink: 0; height: 100vh; }
+        .brand span { font-size: 1.25rem; font-weight: 800; color: var(--primary); }
+        .menu-item { padding: 12px 16px; color: var(--text-muted); border-radius: 8px; cursor: pointer; margin-bottom: 4px; font-weight: 500; display: flex; align-items: center; gap: 12px; text-decoration: none; transition: 0.2s; }
+        .menu-item:hover, .menu-item.active { background: #eef2ff; color: var(--primary); }
+        .menu-item.active { background: var(--primary); color: white; }
+
+        .main-content { flex: 1; padding: 32px; overflow-y: auto; height: 100vh; }
+        .header { display: flex; justify-content: space-between; margin-bottom: 25px; align-items: flex-end; }
+        .breadcrumb { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; font-weight: 600; color: var(--text-muted); }
+        .breadcrumb-item { cursor: pointer; }
+
+        .folder-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; }
+        .folder-card { background: white; padding: 25px; border-radius: 20px; border: 1px solid var(--border); text-align: center; cursor: pointer; transition: 0.3s; }
+        .folder-card:hover { transform: translateY(-5px); border-color: var(--primary); }
+        .folder-icon { font-size: 3rem; color: #facc15; margin-bottom: 15px; }
+
+        .table-view { display: none; }
+        .table-view.active { display: block; }
+        .table-container { background: white; border-radius: 20px; border: 1px solid var(--border); overflow: hidden; }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #f8fafc; text-align: left; padding: 18px 24px; font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; }
+        td { padding: 18px 24px; border-bottom: 1px solid #f1f5f9; font-size: 0.9rem; }
+
+        .btn-action { width: 36px; height: 36px; border-radius: 10px; border: none; cursor: pointer; color: white; transition: 0.3s; }
+        .btn-edit { background: linear-gradient(135deg, #f59e0b, #d97706); }
+        .btn-delete { background: linear-gradient(135deg, #ef4444, #b91c1c); }
+        .btn-assign { background: linear-gradient(135deg, #10b981, #059669); }
+
+        .btn-main { background: var(--primary); color: white; padding: 12px 24px; border-radius: 10px; border: none; cursor: pointer; font-weight: 700; }
+        .modal-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.7); z-index: 1000; display: none; justify-content: center; align-items: center; }
+        .modal-box { background: white; width: 750px; padding: 35px; border-radius: 24px; max-height: 90vh; overflow-y: auto; }
+        .form-control { width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; margin-top: 5px; }
+        .assign-row { display: flex; align-items: center; gap: 12px; background: #f8fafc; padding: 12px; border-radius: 10px; margin-bottom: 8px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="brand"><span>Geincos Admin</span></div>
+        <div class="menu-label">Analítica</div>
+        <a href="dashboard.html" class="menu-item"><i class="fas fa-chart-pie"></i> Dashboard</a>
+        <a href="reportes.html" class="menu-item"><i class="fas fa-file-invoice"></i> Reportes</a>
+        <div class="menu-label">Gestión</div>
+        <a href="postulantes.html" class="menu-item"><i class="fas fa-users"></i> Postulantes</a>
+        <a href="personal-activo.html" class="menu-item active"><i class="fas fa-id-badge"></i> Personal Activo</a>
+        <a href="asistencia.html" class="menu-item"><i class="fas fa-calendar-check"></i> Asistencia</a>
+        <a href="materiales.html" class="menu-item"><i class="fas fa-book"></i> Materiales</a>
+        <a href="ia-roleplay.html" class="menu-item"><i class="fas fa-robot"></i> IA Roleplay</a>
+        <div class="menu-item" style="margin-top:auto; color:var(--danger)" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Cerrar Sesión</div>
+    </div>
+
+    <div class="main-content">
+        <div class="header">
+            <div><h2 id="viewTitle">Gestión de Personal Activo</h2><div class="breadcrumb" id="bread"></div></div>
+            <div style="display:flex; gap:10px">
+                <button class="btn-main" style="background:#10b981" onclick="exportPersonalExcel()">Descargar Excel</button>
+                <button class="btn-main" onclick="openModal('modalUser', 'create')">+ Nuevo Personal</button>
+            </div>
+        </div>
+        <div id="folderContainer" class="folder-grid"></div>
+        <div id="tableView" class="table-view">
+            <div class="table-container">
+                <table>
+                    <thead><tr><th>Colaborador</th><th>Fecha Cartera</th><th>Cartera</th><th>Supervisor</th><th>Tipo</th><th>Acciones</th></tr></thead>
+                    <tbody id="tbUsers"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modalUser">
+        <div class="modal-box">
+            <h3>Gestión de Colaborador</h3>
+            <input type="hidden" id="uId">
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px">
+                <div class="form-group"><label>DNI</label><input id="uDni" class="form-control"></div>
+                <div class="form-group"><label>Nombre Completo</label><input id="uNombre" class="form-control"></div>
+                <div class="form-group"><label>Usuario</label><input id="uUser" class="form-control"></div>
+                <div class="form-group"><label>Grupo</label><input id="uTag" class="form-control"></div>
+                <div class="form-group"><label>Perfil</label>
+                    <select id="uTipo" class="form-control">
+                        <option value="trabajador">Trabajador (Operativo)</option>
+                        <option value="supervisor">Supervisor</option>
+                        <option value="calidad">Calidad</option>
+                        <option value="capacitacion">Postulante (Capacitación)</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>Contraseña</label><input id="uPass" class="form-control" placeholder="En blanco para no cambiar"></div>
+            </div>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-top:20px">
+                <div class="form-group"><label>Cartera</label><input id="uCartera" class="form-control"></div>
+                <div class="form-group"><label>Supervisor</label><select id="uSupervisor" class="form-control"><option value="">- Seleccionar -</option></select></div>
+            </div>
+            <div style="text-align:right; margin-top:25px"><button class="btn-main" style="background:#64748b" onclick="closeModals()">Cerrar</button><button class="btn-main" onclick="saveUser()">Guardar</button></div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modalAssign">
+        <div class="modal-box">
+            <h3>Malla Curricular</h3>
+            <div id="assignList" style="max-height:350px; overflow-y:auto"></div>
+            <div style="text-align:right; margin-top:20px"><button class="btn-main" onclick="executeAssignment()">Guardar Cambios</button></div>
+        </div>
+    </div>
+
+    <script>
+        const SB_URL = 'https://xgvfcmadsprjyljtpooo.supabase.co';
+        const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhndmZjbWFkc3ByanlsanRwb29vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY1ODMxNjAsImV4cCI6MjA4MjE1OTE2MH0.XYBbKFE17PfyYMn2SNL5UJrCQmDRbimTQO0jpbX1Zd0';
+        const sbClient = supabase.createClient(SB_URL, SB_KEY);
+        let allPersonal = [], allMaterials = [], currentAssignUser = '';
+        const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+
+        window.onload = async () => { await loadFullData(); await loadMaterials(); await loadSupervisors(); };
+
+        async function loadFullData() {
+            const { data } = await sbClient.from('usuarios').select('*').neq('tipo', 'capacitacion').neq('rol','admin');
+            allPersonal = data || []; showMonths();
+        }
+
+        async function loadMaterials() { const { data } = await sbClient.from('cursos').select('*'); allMaterials = data || []; }
+
+        async function loadSupervisors() {
+            const { data } = await sbClient.from('usuarios').select('usuario').eq('tipo', 'supervisor');
+            const sel = document.getElementById('uSupervisor');
+            if(data) data.forEach(s => sel.innerHTML += `<option value="${s.usuario}">${s.usuario}</option>`);
+        }
+
+        function showMonths() {
+            document.getElementById('folderContainer').style.display = 'grid';
+            document.getElementById('tableView').classList.remove('active');
+            const months = {};
+            allPersonal.forEach(u => {
+                const date = new Date(u.created_at);
+                const key = `${date.getFullYear()}-${date.getMonth()}`;
+                if(!months[key]) months[key] = { name: `${monthNames[date.getMonth()]} ${date.getFullYear()}` };
+            });
+            let h = '';
+            Object.entries(months).reverse().forEach(([key, val]) => { h += `<div class="folder-card" onclick="showGroups('${key}', '${val.name}')"><i class="fas fa-folder folder-icon"></i><div class="folder-name">${val.name}</div></div>`; });
+            document.getElementById('folderContainer').innerHTML = h;
+        }
+
+        function showGroups(key, name) {
+            const groups = {};
+            allPersonal.filter(u => { const d = new Date(u.created_at); return `${d.getFullYear()}-${d.getMonth()}` === key; }).forEach(u => {
+                const g = u.etiqueta || 'Sin Grupo';
+                if(!groups[g]) groups[g] = 0; groups[g]++;
+            });
+            let h = '';
+            Object.entries(groups).forEach(([n, c]) => { h += `<div class="folder-card" onclick="renderTable('${key}', '${name}', '${n}')"><i class="fas fa-users folder-icon" style="color:#6366f1"></i><div class="folder-name">${n}</div></div>`; });
+            document.getElementById('folderContainer').innerHTML = h;
+        }
+
+        function renderTable(key, monthName, group) {
+            document.getElementById('folderContainer').style.display = 'none';
+            document.getElementById('tableView').classList.add('active');
+            const filtered = allPersonal.filter(u => { const d = new Date(u.created_at); return `${d.getFullYear()}-${d.getMonth()}` === key && (u.etiqueta || 'Sin Grupo') === group; });
+            let h = '';
+            filtered.forEach(u => {
+                h += `<tr><td><b>${u.correo || u.usuario}</b></td><td>${u.fecha_cartera || '-'}</td><td>${u.cartera || '-'}</td><td>${u.supervisor || '-'}</td><td>${u.tipo}</td><td><button class="btn-action btn-assign" onclick="openAssignModal('${u.usuario}')"><i class="fas fa-book"></i></button> <button class="btn-action btn-edit" onclick="editUser('${u.id}')"><i class="fas fa-pen"></i></button></td></tr>`;
+            });
+            document.getElementById('tbUsers').innerHTML = h;
+        }
+
+        async function openAssignModal(user) {
+            currentAssignUser = user;
+            const { data } = await sbClient.from('asignaciones').select('cursos_json').eq('usuario', user).maybeSingle();
+            let currentList = data ? JSON.parse(data.cursos_json) : [];
+            let h = '';
+            allMaterials.forEach(m => {
+                const checked = currentList.includes(m.titulo) ? 'checked' : '';
+                h += `<label class="assign-row"><input type="checkbox" class="chk-m" value="${m.titulo}" ${checked}> <span>${m.titulo}</span></label>`;
+            });
+            document.getElementById('assignList').innerHTML = h;
+            document.getElementById('modalAssign').style.display = 'flex';
+        }
+
+        async function executeAssignment() {
+            const list = Array.from(document.querySelectorAll('.chk-m:checked')).map(c => c.value);
+            const { data: exists } = await sbClient.from('asignaciones').select('id').eq('usuario', currentAssignUser).maybeSingle();
+            if(exists) await sbClient.from('asignaciones').update({cursos_json: JSON.stringify(list)}).eq('id', exists.id);
+            else await sbClient.from('asignaciones').insert([{usuario: currentAssignUser, cursos_json: JSON.stringify(list)}]);
+            alert('Malla Guardada'); closeModals();
+        }
+
+        async function editUser(id) {
+            const u = allPersonal.find(x => x.id == id);
+            if(u) {
+                document.getElementById('uId').value = u.id; document.getElementById('uDni').value = u.dni;
+                document.getElementById('uNombre').value = u.correo || ''; document.getElementById('uUser').value = u.usuario;
+                document.getElementById('uTag').value = u.etiqueta || ''; document.getElementById('uTipo').value = u.tipo;
+                document.getElementById('uCartera').value = u.cartera || ''; document.getElementById('uSupervisor').value = u.supervisor || '';
+                document.getElementById('modalUser').style.display = 'flex';
+            }
+        }
+
+        async function saveUser() {
+            const u = { dni: document.getElementById('uDni').value, correo: document.getElementById('uNombre').value, usuario: document.getElementById('uUser').value, etiqueta: document.getElementById('uTag').value, tipo: document.getElementById('uTipo').value, cartera: document.getElementById('uCartera').value, supervisor: document.getElementById('uSupervisor').value };
+            if(document.getElementById('uPass').value) u.password = document.getElementById('uPass').value;
+            await sbClient.from('usuarios').update(u).eq('id', document.getElementById('uId').value);
+            closeModals(); loadFullData();
+        }
+
+        function closeModals() { document.querySelectorAll('.modal-overlay').forEach(m => m.style.display = 'none'); }
+        function logout() { localStorage.clear(); window.location.href='index.html'; }
+    </script>
+</body>
+</html>
