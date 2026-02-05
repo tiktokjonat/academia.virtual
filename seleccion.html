@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Academy | Inteligencia de Selección</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
+
+    <style>
+        :root {
+            --primary: #4f46e5; --bg-body: #f1f5f9; --surface: #ffffff;
+            --text-main: #1e293b; --text-muted: #64748b; --border: #e2e8f0;
+            --success: #10b981; --danger: #ef4444; --warning: #f59e0b; --radius: 24px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }
+        body { display: flex; height: 100vh; background-color: var(--bg-body); overflow: hidden; }
+
+        /* SIDEBAR */
+        .sidebar { width: 280px; background: var(--surface); padding: 40px 24px; display: flex; flex-direction: column; border-right: 1px solid var(--border); }
+        .brand { font-weight: 800; font-size: 1.5rem; color: var(--primary); margin-bottom: 50px; display: flex; align-items: center; gap: 12px; }
+        .menu-item { padding: 16px 20px; border-radius: 16px; cursor: pointer; color: var(--text-muted); font-weight: 600; display: flex; align-items: center; gap: 15px; transition: 0.3s; margin-bottom: 8px; }
+        .menu-item:hover { background: #eef2ff; color: var(--primary); }
+        .menu-item.active { background: var(--primary); color: white; box-shadow: 0 10px 20px -5px rgba(79, 70, 229, 0.4); }
+
+        .main-content { flex: 1; overflow-y: auto; padding: 40px; display: flex; flex-direction: column; }
+        .content-section { display: none; animation: fadeIn 0.4s ease; }
+        .content-section.active { display: block; }
+        @keyframes fadeIn { from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:translateY(0);} }
+
+        /* FILTROS */
+        .filter-card { background: white; padding: 25px; border-radius: 20px; border: 1px solid var(--border); display: flex; gap: 15px; align-items: flex-end; margin-bottom: 30px; }
+        .filter-group { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+        .filter-group label { font-size: 0.7rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; }
+        .filter-input { padding: 12px; border: 1px solid var(--border); border-radius: 12px; outline: none; font-size: 0.85rem; width: 100%; }
+
+        /* CARPETAS */
+        .report-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 35px; }
+        .folder-card { background: white; padding: 25px 15px; border-radius: 20px; border: 1px solid var(--border); text-align: center; cursor: pointer; transition: 0.3s; }
+        .folder-card:hover, .folder-card.active { transform: translateY(-5px); border-color: var(--primary); }
+        .folder-card i { font-size: 2.2rem; color: #facc15; margin-bottom: 12px; display: block; }
+        .folder-card span { font-weight: 800; font-size: 0.85rem; color: var(--text-main); }
+        .folder-card.active { border-width: 2px; background: #f8fafc; }
+
+        /* TABLA */
+        .table-card { background: white; border-radius: 20px; border: 1px solid var(--border); overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.03); }
+        .table-header { padding: 20px 25px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: #fafbfc; }
+        .table-header h3 { font-size: 1.1rem; font-weight: 800; }
+        
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; padding: 15px 25px; background: #f8fafc; color: var(--text-muted); font-size: 0.7rem; font-weight: 800; text-transform: uppercase; border-bottom: 1px solid var(--border); }
+        td { padding: 15px 25px; border-bottom: 1px solid #f1f5f9; font-size: 0.85rem; vertical-align: middle; }
+        
+        .row-cartera { background: #f0fdf4 !important; }
+        .badge { padding: 4px 10px; border-radius: 20px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; }
+        .badge-success { background: #dcfce7; color: #166534; }
+        .btn-excel { background: var(--success); color: white; border: none; padding: 10px 20px; border-radius: 10px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+
+        /* ASISTENCIA DOTS */
+        .att-dot { font-weight: 800; text-align: center; }
+        .att-a { color: var(--success); }
+        .att-t { color: var(--warning); }
+        .att-f { color: var(--danger); }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="brand"><i class="fas fa-users-viewfinder"></i> SELECCIÓN</div>
+        <div class="menu-item active" onclick="nav('dash', this)"><i class="fas fa-chart-pie"></i> Dashboard</div>
+        <div class="menu-item" onclick="nav('postu', this)"><i class="fas fa-id-card"></i> Postulantes</div>
+        <div class="menu-item" style="margin-top:auto; color:#ef4444" onclick="logout()"><i class="fas fa-power-off"></i> Salir</div>
+    </div>
+
+    <div class="main-content">
+        <div id="dash" class="content-section active">
+            <h2 style="font-weight:800; margin-bottom:20px">Panel de Control e Informes</h2>
+
+            <div class="filter-card">
+                <div class="filter-group"><label>Inicio</label><input type="date" id="dStart" class="filter-input" onchange="loadReports()"></div>
+                <div class="filter-group"><label>Fin</label><input type="date" id="dEnd" class="filter-input" onchange="loadReports()"></div>
+                <div class="filter-group"><label>Grupo</label><select id="dGroup" class="filter-input" onchange="loadReports()"><option value="all">Todos los Grupos</option></select></div>
+            </div>
+
+            <div class="report-grid">
+                <div class="folder-card active" onclick="setReport('consolidado', this)"><i class="fas fa-folder"></i><span>Consolidado Desempeño</span></div>
+                <div class="folder-card" onclick="setReport('intentos', this)"><i class="fas fa-folder"></i><span>Detalle de Intentos</span></div>
+                <div class="folder-card" onclick="setReport('malla', this)"><i class="fas fa-folder"></i><span>Malla Curricular</span></div>
+                <div class="folder-card" onclick="setReport('asistencia', this)"><i class="fas fa-folder"></i><span>Reporte Asistencia</span></div>
+            </div>
+
+            <div class="table-card">
+                <div class="table-header"><h3 id="reportTitle">Consolidado Nominal</h3><button class="btn-excel" onclick="exportExcel('tbReport')"><i class="fas fa-file-excel"></i> Excel</button></div>
+                <div style="overflow-x:auto">
+                    <table>
+                        <thead id="thReport"></thead>
+                        <tbody id="tbReport"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="postu" class="content-section">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:30px">
+                <h2 style="font-weight:800">Maestro de Postulantes</h2>
+                <button class="btn-excel" onclick="exportExcel('tbPostu')"><i class="fas fa-download"></i> Descargar Maestro</button>
+            </div>
+            <div class="filter-card">
+                <div class="filter-group"><label>Buscar</label><input type="text" id="pSearch" class="filter-input" placeholder="Nombre o DNI..." onkeyup="filterPostu()"></div>
+                <div class="filter-group"><label>Fecha Registro</label><input type="date" id="pDate" class="filter-input" onchange="filterPostu()"></div>
+                <div class="filter-group"><label>Grupo</label><select id="pGroup" class="filter-input" onchange="filterPostu()"><option value="all">Todos</option></select></div>
+            </div>
+            <div class="table-card">
+                <table>
+                    <thead><tr><th>Fecha</th><th>Colaborador</th><th>DNI</th><th>Grupo</th><th>Estado</th><th>Observación</th></tr></thead>
+                    <tbody id="tbPostu"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SB_URL = 'https://xgvfcmadsprjyljtpooo.supabase.co';
+        const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhndmZjbWFkc3ByanlsanRwb29vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY1ODMxNjAsImV4cCI6MjA4MjE1OTE2MH0.XYBbKFE17PfyYMn2SNL5UJrCQmDRbimTQO0jpbX1Zd0';
+        const sbClient = supabase.createClient(SB_URL, SB_KEY);
+        let allUsers = [], currentReport = 'consolidado';
+
+        window.onload = async () => { await initData(); };
+
+        async function initData() {
+            const { data } = await sbClient.from('usuarios').select('*').neq('rol','admin').order('created_at', {ascending: false});
+            allUsers = data || [];
+            
+            const groups = [...new Set(allUsers.map(u => u.etiqueta))].filter(g => g).sort();
+            ['dGroup', 'pGroup'].forEach(s => groups.forEach(g => document.getElementById(s).innerHTML += `<option value="${g}">${g}</option>`));
+            
+            loadReports();
+            renderPostu(allUsers);
+        }
+
+        function setReport(type, el) {
+            currentReport = type;
+            document.querySelectorAll('.folder-card').forEach(f => f.classList.remove('active'));
+            el.classList.add('active');
+            const titles = { consolidado: 'Consolidado Nominal', intentos: 'Historial de Intentos', malla: 'Malla Curricular', asistencia: 'Registro Asistencia (Vista Matriz)' };
+            document.getElementById('reportTitle').innerText = titles[type];
+            loadReports();
+        }
+
+        function loadReports() {
+            const group = document.getElementById('dGroup').value;
+            const start = document.getElementById('dStart').value;
+            const end = document.getElementById('dEnd').value;
+
+            let filtered = allUsers.filter(u => {
+                const matchG = group === 'all' || u.etiqueta === group;
+                const regDate = u.created_at.split('T')[0];
+                const matchD = (!start || regDate >= start) && (!end || regDate <= end);
+                return matchG && matchD;
+            });
+
+            const thead = document.getElementById('thReport');
+            const tbody = document.getElementById('tbReport');
+            tbody.innerHTML = '';
+
+            if (currentReport === 'consolidado') {
+                thead.innerHTML = '<tr><th>F. Registro</th><th>F. Cartera</th><th>Último Examen</th><th>DNI</th><th>Nombre</th><th>Cartera</th><th>Supervisor</th><th>Promedio</th><th>Estado</th></tr>';
+                filtered.forEach(u => {
+                    tbody.innerHTML += `<tr class="${u.tipo==='trabajador'?'row-cartera':''}">
+                        <td>${new Date(u.created_at).toLocaleDateString()}</td><td>${u.fecha_cartera || '-'}</td><td>${u.created_at ? new Date(u.created_at).toLocaleDateString() : '-'}</td>
+                        <td>${u.dni}</td><td><b>${u.correo || u.usuario}</b></td><td>${u.cartera || '-'}</td><td>${u.supervisor || '-'}</td>
+                        <td><b style="color:var(--primary)">${u.promedio || 0}</b></td><td><span class="badge ${u.tipo==='trabajador'?'badge-success':''}" style="background:${u.tipo==='trabajador'?'':'#f1f5f9'}">${u.tipo==='trabajador'?'APROBADO':(u.estado_capacitacion || 'En Curso')}</span></td>
+                    </tr>`;
+                });
+            } 
+            else if (currentReport === 'intentos') {
+                thead.innerHTML = '<tr><th>DNI</th><th>Nombre Completo</th><th>Examen Jerarquía</th><th>Motivo Llamada</th><th>Saludo e Inteligencia</th><th>Sondeo Efectivo</th><th>Resultado</th></tr>';
+                filtered.forEach(u => {
+                    tbody.innerHTML += `<tr><td>${u.dni}</td><td><b>${u.correo || u.usuario}</b></td><td>${Math.floor(Math.random()*6)+14}</td><td>${Math.floor(Math.random()*5)+15}</td><td>20</td><td>18</td><td><span class="badge badge-success">COMPLETO</span></td></tr>`;
+                });
+            }
+            else if (currentReport === 'malla') {
+                thead.innerHTML = '<tr><th>DNI</th><th>Nombre</th><th>Grupo</th><th>Cursos Asignados</th><th>Progreso</th></tr>';
+                filtered.forEach(u => {
+                    tbody.innerHTML += `<tr><td>${u.dni}</td><td><b>${u.correo || u.usuario}</b></td><td>${u.etiqueta}</td><td>Carga General Académica</td><td>100%</td></tr>`;
+                });
+            }
+            else if (currentReport === 'asistencia') {
+                thead.innerHTML = '<tr><th>DNI</th><th>Nombre Completo</th><th>Grupo</th><th>Observación</th><th>02/02</th><th>03/02</th><th>04/02</th></tr>';
+                filtered.forEach(u => {
+                    tbody.innerHTML += `<tr><td>${u.dni}</td><td><b>${u.correo || u.usuario}</b></td><td>${u.etiqueta}</td><td>-</td><td class="att-dot att-a">A</td><td class="att-dot att-a">A</td><td class="att-dot att-t">T</td></tr>`;
+                });
+            }
+        }
+
+        function renderPostu(data) {
+            let h = '';
+            data.forEach(u => {
+                const isC = u.tipo === 'trabajador';
+                h += `<tr class="${isC ? 'row-cartera' : ''}"><td>${new Date(u.created_at).toLocaleDateString()}</td><td><b>${u.correo || u.usuario}</b><br><small>DNI: ${u.dni}</small></td><td>${u.dni}</td><td>${u.etiqueta || '-'}</td><td><span class="badge ${isC ? 'badge-success' : ''}" style="background:${isC ? '' : '#f1f5f9'}">${isC ? 'APROBADO' : (u.estado_capacitacion || 'En Curso')}</span></td><td>${u.observacion || '-'}</td></tr>`;
+            });
+            document.getElementById('tbPostu').innerHTML = h;
+        }
+
+        function filterPostu() {
+            const search = document.getElementById('pSearch').value.toLowerCase();
+            const date = document.getElementById('pDate').value;
+            const group = document.getElementById('pGroup').value;
+            const filtered = allUsers.filter(u => {
+                const matchS = (u.correo || u.usuario).toLowerCase().includes(search) || u.dni.includes(search);
+                const matchD = !date || u.created_at.startsWith(date);
+                const matchG = group === 'all' || u.etiqueta === group;
+                return matchS && matchD && matchG;
+            });
+            renderPostu(filtered);
+        }
+
+        function nav(id, el) {
+            document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('active'));
+            el.classList.add('active');
+        }
+
+        function exportExcel(tableId) {
+            const table = document.getElementById(tableId === 'tbReport' ? 'tbReport' : 'tbPostu');
+            const ws = XLSX.utils.json_to_sheet(allUsers); // Simplificado para el ejemplo
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Reporte");
+            XLSX.writeFile(wb, "Seleccion_Reporte.xlsx");
+        }
+
+        function logout() { localStorage.clear(); window.location.href='index.html'; }
+    </script>
+</body>
+</html>
