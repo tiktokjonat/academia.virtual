@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Academy | Selección Premium</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
+
+    <style>
+        :root {
+            --primary: #4f46e5; --primary-soft: #eef2ff; --bg-body: #f1f5f9; --surface: #ffffff;
+            --text-main: #1e293b; --text-muted: #64748b; --border: #e2e8f0;
+            --success: #10b981; --danger: #ef4444; --warning: #f59e0b; --radius: 20px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }
+        body { display: flex; height: 100vh; background-color: var(--bg-body); overflow: hidden; }
+
+        /* SIDEBAR */
+        .sidebar { width: 260px; background: var(--surface); padding: 30px 20px; display: flex; flex-direction: column; border-right: 1px solid var(--border); }
+        .brand { font-weight: 800; font-size: 1.4rem; color: var(--primary); margin-bottom: 40px; display: flex; align-items: center; gap: 12px; }
+        .menu-item { padding: 14px 18px; border-radius: 12px; cursor: pointer; color: var(--text-muted); font-weight: 600; display: flex; align-items: center; gap: 15px; transition: 0.3s; margin-bottom: 5px; }
+        .menu-item:hover { background: var(--primary-soft); color: var(--primary); }
+        .menu-item.active { background: var(--primary); color: white; box-shadow: 0 10px 20px -5px rgba(79, 70, 229, 0.4); }
+
+        .main-content { flex: 1; overflow-y: auto; padding: 40px; display: flex; flex-direction: column; }
+        .content-section { display: none; animation: fadeIn 0.4s ease; }
+        .content-section.active { display: block; }
+        @keyframes fadeIn { from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:translateY(0);} }
+
+        /* FILTROS */
+        .filter-card { background: white; padding: 25px; border-radius: 16px; border: 1px solid var(--border); display: flex; gap: 15px; align-items: flex-end; margin-bottom: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }
+        .filter-group { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+        .filter-group label { font-size: 0.65rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; }
+        .filter-input { padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; outline: none; font-size: 0.85rem; width: 100%; color: var(--text-main); font-weight: 500; }
+
+        /* CARPETAS */
+        .report-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 30px; }
+        .folder-card { background: white; padding: 25px 15px; border-radius: 16px; border: 1px solid var(--border); text-align: center; cursor: pointer; transition: 0.3s; }
+        .folder-card:hover, .folder-card.active { transform: translateY(-3px); border-color: var(--primary); }
+        .folder-card i { font-size: 2.5rem; color: #facc15; margin-bottom: 12px; display: block; }
+        .folder-card span { font-weight: 700; font-size: 0.85rem; color: var(--text-main); }
+        .folder-card.active { border-width: 2px; background: #fafbfc; border-color: var(--primary); }
+
+        /* TABLA */
+        .table-card { background: white; border-radius: 16px; border: 1px solid var(--border); overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.03); }
+        .table-header { padding: 18px 25px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: #ffffff; }
+        .table-header h3 { font-size: 1rem; font-weight: 800; color: var(--text-main); }
+        
+        table { width: 100%; border-collapse: collapse; }
+        /* AJUSTE DE ALINEACIÓN: Centrado por defecto */
+        th { text-align: center; padding: 16px 20px; background: #f8fafc; color: var(--text-muted); font-size: 0.7rem; font-weight: 800; text-transform: uppercase; border-bottom: 1px solid var(--border); }
+        td { text-align: center; padding: 16px 20px; border-bottom: 1px solid #f1f5f9; font-size: 0.85rem; vertical-align: middle; }
+        
+        /* Alineación especial para nombres y observaciones */
+        th.align-left, td.align-left { text-align: left; }
+        
+        .row-cartera { background: #f0fdf4 !important; position: relative; }
+        .row-cartera::after { content: ''; position: absolute; left: 0; top: 0; height: 100%; width: 4px; background: var(--success); }
+
+        .btn-excel { background: var(--success); color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: 800; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 0.75rem; }
+
+        .att-dot { font-weight: 800; text-align: center; font-size: 0.9rem; }
+        .att-a { color: var(--success); }
+        .att-t { color: var(--warning); }
+        .att-f { color: var(--danger); }
+        .badge { padding: 5px 12px; border-radius: 20px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; }
+        .badge-success { background: #dcfce7; color: #166534; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="brand"><i class="fas fa-users-viewfinder"></i> SELECCIÓN</div>
+        <div class="menu-item active" onclick="nav('dash', this)"><i class="fas fa-chart-pie"></i> Dashboard</div>
+        <div class="menu-item" onclick="nav('postu', this)"><i class="fas fa-id-card"></i> Postulantes</div>
+        <div class="menu-item" style="margin-top:auto; color:#ef4444" onclick="logout()"><i class="fas fa-power-off"></i> Salir</div>
+    </div>
+
+    <div class="main-content">
+        <div id="dash" class="content-section active">
+            <h2 style="font-weight:800; font-size:1.6rem; margin-bottom:10px">Panel de Control e Informes</h2>
+            <p style="color:var(--text-muted); font-size:0.9rem; margin-bottom:25px">Visualización de reportes sincronizados.</p>
+
+            <div class="filter-card">
+                <div class="filter-group"><label>Registro Inicio</label><input type="date" id="dStart" class="filter-input" onchange="loadReports()"></div>
+                <div class="filter-group"><label>Registro Fin</label><input type="date" id="dEnd" class="filter-input" onchange="loadReports()"></div>
+                <div class="filter-group"><label>Grupo / Corte</label><select id="dGroup" class="filter-input" onchange="loadReports()"><option value="all">Todos los Grupos</option></select></div>
+            </div>
+
+            <div class="report-grid">
+                <div class="folder-card active" onclick="setReport('consolidado', this)"><i class="fas fa-folder"></i><span>Consolidado Desempeño</span></div>
+                <div class="folder-card" onclick="setReport('intentos', this)"><i class="fas fa-folder"></i><span>Detalle de Intentos</span></div>
+                <div class="folder-card" onclick="setReport('malla', this)"><i class="fas fa-folder"></i><span>Malla Curricular</span></div>
+                <div class="folder-card" onclick="setReport('asistencia', this)"><i class="fas fa-folder"></i><span>Reporte Asistencia</span></div>
+            </div>
+
+            <div class="table-card">
+                <div class="table-header"><h3 id="reportTitle">Consolidado Nominal</h3><button class="btn-excel" onclick="exportExcel('tableMain')"><i class="fas fa-file-excel"></i> Excel</button></div>
+                <div style="overflow-x:auto">
+                    <table id="tableMain">
+                        <thead id="thReport"></thead>
+                        <tbody id="tbReport"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="postu" class="content-section">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:30px">
+                <h2 style="font-weight:800; font-size:1.6rem">Maestro de Postulantes</h2>
+                <button class="btn-excel" style="padding:12px 20px" onclick="exportExcel('tbPostu')"><i class="fas fa-download"></i> Descargar Maestro</button>
+            </div>
+            <div class="filter-card">
+                <div class="filter-group"><label>Buscar Postulante</label><input type="text" id="pSearch" class="filter-input" placeholder="Nombre o DNI..." onkeyup="filterPostu()"></div>
+                <div class="filter-group"><label>Fecha Registro</label><input type="date" id="pDate" class="filter-input" onchange="filterPostu()"></div>
+                <div class="filter-group"><label>Filtrar por Grupo</label><select id="pGroup" class="filter-input" onchange="filterPostu()"><option value="all">Todos</option></select></div>
+            </div>
+            <div class="table-card">
+                <table>
+                    <thead><tr><th>Registro</th><th class="align-left">Postulante / DNI</th><th>Grupo</th><th>Cartera / Sup</th><th>Estado</th><th class="align-left">Observación</th></tr></thead>
+                    <tbody id="tbPostu"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SB_URL = 'https://xgvfcmadsprjyljtpooo.supabase.co';
+        const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhndmZjbWFkc3ByanlsanRwb29vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY1ODMxNjAsImV4cCI6MjA4MjE1OTE2MH0.XYBbKFE17PfyYMn2SNL5UJrCQmDRbimTQO0jpbX1Zd0';
+        const sbClient = supabase.createClient(SB_URL, SB_KEY);
+        let allUsers = [], currentReport = 'consolidado';
+
+        window.onload = async () => { await initData(); };
+
+        async function initData() {
+            try {
+                const { data, error } = await sbClient.from('usuarios').select('*').neq('rol','admin').order('created_at', {ascending: false});
+                if (error) throw error;
+                allUsers = data || [];
+                const groups = [...new Set(allUsers.map(u => u.etiqueta))].filter(g => g).sort();
+                ['dGroup', 'pGroup'].forEach(id => {
+                    const el = document.getElementById(id);
+                    groups.forEach(g => el.innerHTML += `<option value="${g}">${g}</option>`);
+                });
+                loadReports();
+                renderPostu(allUsers);
+            } catch (e) { console.error(e); }
+        }
+
+        function setReport(type, el) {
+            currentReport = type;
+            document.querySelectorAll('.folder-card').forEach(f => f.classList.remove('active'));
+            el.classList.add('active');
+            const titles = { consolidado: 'Consolidado Nominal', intentos: 'Historial de Intentos', malla: 'Malla Curricular', asistencia: 'Registro Asistencia (Vista Matriz)' };
+            document.getElementById('reportTitle').innerText = titles[type];
+            loadReports();
+        }
+
+        async function loadReports() {
+            const group = document.getElementById('dGroup').value;
+            const start = document.getElementById('dStart').value;
+            const end = document.getElementById('dEnd').value;
+
+            let filteredUsers = allUsers.filter(u => {
+                const matchG = group === 'all' || u.etiqueta === group;
+                const regDate = u.created_at.split('T')[0];
+                const matchD = (!start || regDate >= start) && (!end || regDate <= end);
+                return matchG && matchD;
+            });
+
+            const thead = document.getElementById('thReport');
+            const tbody = document.getElementById('tbReport');
+            tbody.innerHTML = '<tr><td colspan="15" style="text-align:center; padding:50px">Generando reporte...</td></tr>';
+
+            if (currentReport === 'asistencia') {
+                try {
+                    const { data: attData, error } = await sbClient.from('asistencias').select('*');
+                    if (error) throw error;
+                    
+                    if (!attData || attData.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="15" style="text-align:center; padding:50px">Sin marcaciones registradas.</td></tr>';
+                        return;
+                    }
+
+                    const filteredUsernames = filteredUsers.map(u => u.usuario);
+                    const recordsForFiltered = attData.filter(a => filteredUsernames.includes(a.usuario));
+                    const activeDates = [...new Set(recordsForFiltered.map(a => a.fecha))].sort();
+
+                    if (activeDates.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="15" style="text-align:center; padding:50px">No hay marcaciones para este grupo/fecha.</td></tr>';
+                        return;
+                    }
+
+                    let head = '<tr><th>DNI</th><th class="align-left">Nombre Completo</th><th>Grupo</th><th class="align-left">Observación</th>';
+                    activeDates.forEach(d => head += `<th>${d.split('-').reverse().slice(0,2).join('/')}</th>`);
+                    thead.innerHTML = head + '</tr>';
+                    
+                    tbody.innerHTML = '';
+                    filteredUsers.forEach(u => {
+                        let row = `<tr><td>${u.dni}</td><td class="align-left"><b>${u.correo || u.usuario}</b></td><td>${u.etiqueta}</td><td class="align-left"><small>${u.observacion || '-'}</small></td>`;
+                        activeDates.forEach(d => {
+                            const entry = attData.find(a => a.usuario === u.usuario && a.fecha === d);
+                            let status = '-';
+                            if (entry) {
+                                const st = entry.estado.toUpperCase();
+                                if (st === 'A' || st.startsWith('P')) status = 'A';
+                                else if (st === 'T' || st.startsWith('T')) status = 'T';
+                                else if (st === 'F' || st.startsWith('F')) status = 'F';
+                            }
+                            const cls = status === 'A' ? 'att-a' : status === 'T' ? 'att-t' : status === 'F' ? 'att-f' : '';
+                            row += `<td class="att-dot ${cls}">${status}</td>`;
+                        });
+                        tbody.innerHTML += row + '</tr>';
+                    });
+                } catch (e) { tbody.innerHTML = '<tr><td colspan="15" style="text-align:center; padding:50px; color:red">Error al cargar asistencias.</td></tr>'; }
+            } else if (currentReport === 'consolidado') {
+                thead.innerHTML = '<tr><th>F. Registro</th><th>F. Cartera</th><th>Último Examen</th><th>DNI</th><th class="align-left">Nombre</th><th>Cartera</th><th>Supervisor</th><th>Promedio</th><th>Estado</th></tr>';
+                tbody.innerHTML = '';
+                filteredUsers.forEach(u => {
+                    const isC = u.tipo === 'trabajador';
+                    tbody.innerHTML += `<tr class="${isC ? 'row-cartera' : ''}">
+                        <td>${new Date(u.created_at).toLocaleDateString()}</td><td>${u.fecha_cartera || '-'}</td><td>${u.created_at ? new Date(u.created_at).toLocaleDateString() : '-'}</td>
+                        <td>${u.dni}</td><td class="align-left"><b>${u.correo || u.usuario}</b></td><td>${u.cartera || '-'}</td><td>${u.supervisor || '-'}</td>
+                        <td><b style="color:var(--primary)">${u.promedio || 0}</b></td><td><span class="badge ${isC ? 'badge-success' : ''}" style="background:${isC?'':'#f1f5f9'}">${isC ? 'APROBADO' : (u.estado_capacitacion || 'En Curso')}</span></td>
+                    </tr>`;
+                });
+            }
+        }
+
+        function renderPostu(data) {
+            let h = '';
+            data.forEach(u => {
+                const isC = u.tipo === 'trabajador';
+                h += `<tr class="${isC ? 'row-cartera' : ''}">
+                    <td>${new Date(u.created_at).toLocaleDateString()}</td>
+                    <td class="align-left"><b>${u.correo || u.usuario}</b><br><small>DNI: ${u.dni}</small></td>
+                    <td><span style="font-weight:700; color:var(--primary)">${u.etiqueta || '-'}</span></td>
+                    <td><b>C:</b> ${u.cartera || '-'}<br><small><b>S:</b> ${u.supervisor || '-'}</small></td>
+                    <td><span class="badge ${isC ? 'badge-success' : ''}" style="background:${isC ? '' : '#f1f5f9'}">${isC ? 'APROBADO' : (u.estado_capacitacion || 'En Curso')}</span></td>
+                    <td class="align-left"><small style="color:var(--text-muted)">${u.observacion || '-'}</small></td>
+                </tr>`;
+            });
+            document.getElementById('tbPostu').innerHTML = h;
+        }
+
+        function filterPostu() {
+            const s = document.getElementById('pSearch').value.toLowerCase();
+            const d = document.getElementById('pDate').value;
+            const g = document.getElementById('pGroup').value;
+            const filtered = allUsers.filter(u => ((u.correo || u.usuario).toLowerCase().includes(s) || u.dni.includes(s)) && (!d || u.created_at.startsWith(d)) && (g === 'all' || u.etiqueta === g));
+            renderPostu(filtered);
+        }
+
+        function nav(id, el) {
+            document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('active'));
+            el.classList.add('active');
+        }
+
+        function exportExcel(tableId) {
+            const table = document.getElementById(tableId);
+            const ws = XLSX.utils.table_to_sheet(table);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Reporte");
+            XLSX.writeFile(wb, "Seleccion_Geincos_Reporte.xlsx");
+        }
+
+        function logout() { localStorage.clear(); window.location.href='index.html'; }
+    </script>
+</body>
+</html>
