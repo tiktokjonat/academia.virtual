@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Geincos Admin | Gestión IA Roleplay</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <style>
+        :root { --primary: #4f46e5; --bg-body: #f3f4f6; --surface: #ffffff; --text-main: #1e293b; --text-muted: #64748b; --success: #10b981; --danger: #ef4444; --warning: #f59e0b; --border: #e2e8f0; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        body { background-color: var(--bg-body); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; }
+        
+        .sidebar { width: 260px; background: var(--surface); border-right: 1px solid var(--border); padding: 24px; display: flex; flex-direction: column; flex-shrink: 0; z-index: 50; }
+        .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 40px; font-weight: 800; font-size: 1.25rem; color: var(--primary); }
+        .menu-item { padding: 12px 16px; color: var(--text-muted); border-radius: 8px; cursor: pointer; margin-bottom: 4px; display: flex; align-items: center; gap: 12px; text-decoration: none; font-weight: 500; transition: 0.2s; }
+        .menu-item:hover { background: #eef2ff; color: var(--primary); }
+        .menu-item.active { background: var(--primary); color: white; }
+
+        .main-content { flex: 1; padding: 32px; overflow-y: auto; display: flex; flex-direction: column; height: 100vh; }
+        .header { display: flex; justify-content: space-between; margin-bottom: 25px; align-items: center; }
+
+        .grid-folders { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .folder-card { background: white; padding: 25px; border-radius: 20px; border: 1px solid var(--border); cursor: pointer; transition: 0.3s; text-align: center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+        .folder-card:hover { transform: translateY(-5px); border-color: var(--primary); }
+        .folder-icon { font-size: 3rem; color: #facc15; margin-bottom: 15px; }
+        .folder-name { font-weight: 800; color: var(--text-main); font-size: 1rem; }
+
+        .table-container { background: white; border-radius: 16px; border: 1px solid var(--border); overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; padding: 15px 20px; background: #f8fafc; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; border-bottom: 1px solid var(--border); }
+        td { padding: 15px 20px; border-bottom: 1px solid #f1f5f9; font-size: 0.9rem; vertical-align: middle; }
+        
+        .btn-primary { background: var(--primary); color: white; padding: 12px 24px; border-radius: 10px; border: none; cursor: pointer; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 10px; transition: 0.2s; }
+        .btn-back { background: white; color: var(--text-muted); padding: 10px 18px; border-radius: 10px; border: 1px solid var(--border); cursor: pointer; margin-bottom: 25px; font-weight: 700; transition: 0.2s; }
+        
+        .modal-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(15, 23, 42, 0.7); z-index: 1000; display: none; justify-content: center; align-items: center; backdrop-filter: blur(4px); }
+        .modal-box { background: white; width: 850px; padding: 40px; border-radius: 24px; max-height: 90vh; overflow-y: auto; }
+        .form-control { width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; outline: none; margin-top: 5px; font-size: 0.9rem; }
+        
+        .key-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center;}
+        
+        .action-btns { display: flex; gap: 8px; }
+        .btn-sm { padding: 8px 12px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; font-size: 0.8rem; color: white; transition: 0.2s; }
+        .btn-edit { background: var(--warning); }
+        .btn-edit:hover { background: #d97706; }
+        .btn-delete { background: var(--danger); }
+        .btn-delete:hover { background: #b91c1c; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="brand"><i class="fas fa-cube"></i><span>Geincos Admin</span></div>
+        <a href="postulantes.html" class="menu-item"><i class="fas fa-users"></i> Postulantes</a>
+        <a href="ia-roleplay.html" class="menu-item active"><i class="fas fa-robot"></i> IA Roleplay</a>
+        <div class="menu-item" style="margin-top:auto; color:var(--danger)" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Cerrar Sesión</div>
+    </div>
+
+    <div class="main-content">
+        <div id="sectionFolders">
+            <div class="header">
+                <h2>Módulos IA</h2>
+                <button class="btn-primary" onclick="openModal('modalRoleplay', 'create')">+ Nuevo Escenario</button>
+            </div>
+            <div id="viewModuleFolders" class="grid-folders"></div>
+        </div>
+        
+        <div id="viewScenariosDetail" style="display:none">
+            <div class="header">
+                <button class="btn-back" onclick="showFolders()"><i class="fas fa-arrow-left"></i> Volver a Módulos</button>
+                <button class="btn-primary" onclick="openModal('modalRoleplay', 'create')">+ Nuevo Escenario</button>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead><tr><th>Título</th><th>Cliente Principal</th><th>Keys</th><th>Acciones</th></tr></thead>
+                    <tbody id="tbRoleplays"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modalRoleplay">
+        <div class="modal-box">
+            <h3>Gestión de Escenario IA</h3>
+            <input type="hidden" id="rpId">
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-top:15px">
+                <div><label>Título (Campaña)</label><input id="rpTitulo" class="form-control" placeholder="Ej: Negociación Banco"></div>
+                <div><label>Carpeta (Módulo)</label><input id="rpModulo" class="form-control" placeholder="Opcional"></div>
+            </div>
+            
+            <div style="margin-top:15px">
+                <label>Instrucciones de la IA (Prompt del Sistema)</label>
+                <textarea id="rpPrompt" class="form-control" rows="5" placeholder="Eres un cliente llamado..."></textarea>
+            </div>
+            
+            <h4 style="margin-top:20px; font-size:0.9rem; color:var(--primary)">Datos del Cliente (JSON Dinámico)</h4>
+            <div style="background:#f8fafc; padding:15px; border-radius:10px; border:1px solid #e2e8f0">
+                <div id="jsonFieldsContainer">
+                    </div>
+                <button class="btn-primary" style="background:#eef2ff; color:var(--primary); margin-top:15px; width: 100%" onclick="addJsonField()">+ Agregar Dato Personalizado</button>
+            </div>
+            
+            <div style="margin-top:20px">
+                <label>API Keys (OpenAI)</label>
+                <div id="apiKeysContainer"></div>
+                <button class="btn-primary" style="width:100%; background:#eef2ff; color:var(--primary); margin-top:10px" onclick="addApiKeyField()">+ Agregar Key</button>
+            </div>
+            
+            <div style="text-align:right; margin-top:25px">
+                <button class="btn-primary" style="background:#64748b; display:inline-block" onclick="closeModals()">Cancelar</button>
+                <button class="btn-primary" style="display:inline-block; margin-left:10px" onclick="saveRoleplay()">Guardar Escenario</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SB_URL = 'https://xgvfcmadsprjyljtpooo.supabase.co';
+        const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhndmZjbWFkc3ByanlsanRwb29vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY1ODMxNjAsImV4cCI6MjA4MjE1OTE2MH0.XYBbKFE17PfyYMn2SNL5UJrCQmDRbimTQO0jpbX1Zd0';
+        const sbClient = supabase.createClient(SB_URL, SB_KEY);
+        let scenariosByModule = {};
+        let currentOpenModule = null;
+
+        window.onload = loadData;
+
+        async function loadData() {
+            const { data, error } = await sbClient.from('roleplay_scenarios').select('*').order('titulo');
+            if(error) return console.error("Error cargando:", error);
+            
+            scenariosByModule = {};
+            if(data) data.forEach(r => {
+                const mod = r.modulo || 'General';
+                if(!scenariosByModule[mod]) scenariosByModule[mod] = [];
+                scenariosByModule[mod].push(r);
+            });
+            
+            if(currentOpenModule && scenariosByModule[currentOpenModule]) {
+                openModule(currentOpenModule);
+            } else {
+                renderFolders();
+            }
+        }
+
+        function renderFolders() {
+            currentOpenModule = null;
+            let h = '';
+            Object.keys(scenariosByModule).sort().forEach(mod => {
+                h += `<div class="folder-card" onclick="openModule('${mod}')">
+                        <i class="fas fa-folder folder-icon"></i>
+                        <div class="folder-name">${mod}</div>
+                        <div style="font-size:0.8rem; color:var(--text-muted); margin-top:5px">${scenariosByModule[mod].length} Escenarios</div>
+                      </div>`;
+            });
+            document.getElementById('viewModuleFolders').innerHTML = h || '<p style="text-align:center; grid-column:1/-1">No hay datos.</p>';
+            document.getElementById('sectionFolders').style.display = 'block';
+            document.getElementById('viewScenariosDetail').style.display = 'none';
+        }
+
+        function openModule(mod) {
+            currentOpenModule = mod;
+            document.getElementById('sectionFolders').style.display = 'none';
+            document.getElementById('viewScenariosDetail').style.display = 'block';
+            let h = '';
+            scenariosByModule[mod].forEach(r => {
+                const clientData = r.datos_cliente || {}; 
+                const clientName = Array.isArray(clientData.nombre) ? clientData.nombre[0] : (clientData.nombre || '-');
+
+                h += `<tr>
+                        <td><b>${r.titulo}</b></td>
+                        <td>${clientName}</td>
+                        <td><span style="background:#eef2ff; color:var(--primary); padding:4px 8px; border-radius:6px; font-size:0.8rem; font-weight:bold">${r.api_keys?.length || 0} Keys</span></td>
+                        <td>
+                            <div class="action-btns">
+                                <button class="btn-sm btn-edit" onclick="editRoleplay('${r.id}')"><i class="fas fa-pen"></i></button>
+                                <button class="btn-sm btn-delete" onclick="deleteRoleplay('${r.id}')"><i class="fas fa-trash"></i></button>
+                            </div>
+                        </td>
+                      </tr>`;
+            });
+            document.getElementById('tbRoleplays').innerHTML = h;
+        }
+
+        // --- GESTIÓN JSON DINÁMICO ---
+        function addJsonField(key = "", value = "") {
+            const container = document.getElementById('jsonFieldsContainer');
+            const div = document.createElement('div');
+            div.className = 'key-row json-field-row';
+            div.innerHTML = `
+                <input type="text" class="form-control json-key" value="${key}" placeholder="Nombre del dato (Ej: mora, dni)" style="flex:1; margin:0">
+                <input type="text" class="form-control json-val" value="${value}" placeholder="Valor (Ej: 380, Juan)" style="flex:2; margin:0">
+                <button class="btn-primary" style="background:var(--danger); padding:0 15px; margin:0" onclick="this.parentElement.remove()"><i class="fas fa-times"></i></button>
+            `;
+            container.appendChild(div);
+        }
+
+        function addApiKeyField(val = "") {
+            const container = document.getElementById('apiKeysContainer');
+            const div = document.createElement('div'); div.className = 'key-row';
+            div.innerHTML = `<input type="password" class="form-control key-input" value="${val}" style="flex:1; margin:0" placeholder="sk-proj-..."><button class="btn-primary" style="background:var(--danger); padding:0 15px; margin:0" onclick="this.parentElement.remove()"><i class="fas fa-times"></i></button>`;
+            container.appendChild(div);
+        }
+
+        async function saveRoleplay() {
+            const keys = [];
+            document.querySelectorAll('.key-input').forEach(i => { if(i.value.trim()) keys.push(i.value.trim()); });
+            
+            // Construir el JSON recopilando todos los campos dinámicos
+            const clientInfo = {};
+            document.querySelectorAll('.json-field-row').forEach(row => {
+                const k = row.querySelector('.json-key').value.trim();
+                const v = row.querySelector('.json-val').value.trim();
+                if(k) clientInfo[k] = v;
+            });
+
+            const payload = {
+                titulo: document.getElementById('rpTitulo').value,
+                prompt_sistema: document.getElementById('rpPrompt').value,
+                api_keys: keys,
+                datos_cliente: clientInfo
+            };
+
+            const moduloValue = document.getElementById('rpModulo').value.trim();
+            if(moduloValue) payload.modulo = moduloValue;
+
+            const id = document.getElementById('rpId').value;
+            let res;
+            
+            try {
+                if(id) res = await sbClient.from('roleplay_scenarios').update(payload).eq('id', id);
+                else res = await sbClient.from('roleplay_scenarios').insert([payload]);
+
+                if(res.error) {
+                    if(res.error.message.includes("column 'modulo'")) {
+                        delete payload.modulo;
+                        if(id) res = await sbClient.from('roleplay_scenarios').update(payload).eq('id', id);
+                        else res = await sbClient.from('roleplay_scenarios').insert([payload]);
+                    }
+                }
+
+                if(res.error) throw res.error;
+                
+                alert("Escenario guardado correctamente.");
+                closeModals(); 
+                loadData();
+            } catch (err) {
+                alert("Error al guardar: " + err.message);
+                console.error(err);
+            }
+        }
+
+        async function editRoleplay(id) {
+            const { data } = await sbClient.from('roleplay_scenarios').select('*').eq('id', id).single();
+            if(data) {
+                document.getElementById('rpId').value = data.id;
+                document.getElementById('rpTitulo').value = data.titulo || '';
+                document.getElementById('rpModulo').value = data.modulo || '';
+                document.getElementById('rpPrompt').value = data.prompt_sistema || '';
+                
+                // Cargar JSON Dinámico
+                const container = document.getElementById('jsonFieldsContainer');
+                container.innerHTML = '';
+                const clientData = data.datos_cliente || {};
+                
+                if(Object.keys(clientData).length > 0) {
+                    for(let key in clientData) {
+                        // Desempaquetar arrays en caso de que vengan de formatos antiguos
+                        let val = Array.isArray(clientData[key]) ? clientData[key][0] : clientData[key];
+                        addJsonField(key, val);
+                    }
+                } else {
+                    addJsonField("nombre", "");
+                }
+                
+                // Cargar Keys
+                document.getElementById('apiKeysContainer').innerHTML = '';
+                if(data.api_keys && data.api_keys.length > 0) {
+                    data.api_keys.forEach(k => addApiKeyField(k));
+                } else {
+                    addApiKeyField();
+                }
+                
+                document.getElementById('modalRoleplay').style.display = 'flex';
+            }
+        }
+
+        async function deleteRoleplay(id) {
+            if(confirm("¿Estás seguro de eliminar este escenario de IA? Esta acción no se puede deshacer.")) {
+                const { error } = await sbClient.from('roleplay_scenarios').delete().eq('id', id);
+                if(error) {
+                    alert("Error al eliminar: " + error.message);
+                } else {
+                    alert("Escenario eliminado.");
+                    loadData();
+                }
+            }
+        }
+
+        function openModal(id, mode) { 
+            document.getElementById(id).style.display = 'flex'; 
+            if(mode === 'create') {
+                document.getElementById('rpId').value = ''; 
+                document.getElementById('rpTitulo').value = '';
+                document.getElementById('rpModulo').value = currentOpenModule || '';
+                document.getElementById('rpPrompt').value = '';
+                
+                document.getElementById('jsonFieldsContainer').innerHTML = '';
+                addJsonField("nombre", "");
+                addJsonField("mora", "");
+                addJsonField("deuda", "");
+                
+                document.getElementById('apiKeysContainer').innerHTML = ''; 
+                addApiKeyField(); 
+            }
+        }
+        function closeModals() { document.querySelectorAll('.modal-overlay').forEach(m => m.style.display = 'none'); }
+        function showFolders() { currentOpenModule = null; renderFolders(); }
+        function logout() { localStorage.clear(); window.location.href='index.html'; }
+    </script>
+</body>
+</html>
