@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Geincos Admin | Gestión Postulantes</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
+
+    <style>
+        :root { --primary: #4f46e5; --bg-body: #f3f4f6; --surface: #ffffff; --text-main: #1e293b; --text-muted: #64748b; --success: #10b981; --danger: #ef4444; --warning: #f59e0b; --border: #e2e8f0; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        body { background-color: var(--bg-body); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; }
+        
+        .sidebar { width: 260px; background: var(--surface); border-right: 1px solid var(--border); padding: 24px; display: flex; flex-direction: column; flex-shrink: 0; position: sticky; top: 0; height: 100vh; z-index: 100; }
+        .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 40px; font-weight: 800; font-size: 1.25rem; color: var(--primary); }
+        .menu-label { font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; margin: 20px 0 10px 10px; }
+        .menu-item { padding: 12px 16px; color: var(--text-muted); border-radius: 8px; cursor: pointer; margin-bottom: 4px; font-weight: 500; display: flex; align-items: center; gap: 12px; text-decoration: none; transition: 0.2s; }
+        .menu-item:hover { background: #eef2ff; color: var(--primary); }
+        .menu-item.active { background: var(--primary); color: white; }
+
+        .main-content { flex: 1; padding: 32px; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        .header { display: flex; justify-content: space-between; margin-bottom: 25px; align-items: flex-end; flex-shrink: 0; }
+        
+        .filters-bar { background: white; padding: 20px; border-radius: 16px; border: 1px solid var(--border); display: flex; gap: 15px; margin-bottom: 20px; align-items: flex-end; flex-shrink: 0; }
+        .filter-group { display: flex; flex-direction: column; gap: 5px; }
+        .filter-group label { font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; }
+        .filter-input { padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; outline: none; min-width: 200px; }
+
+        .table-container { background: var(--surface); border-radius: 20px; border: 1px solid var(--border); overflow-y: auto; flex-grow: 1; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #f8fafc; text-align: left; padding: 18px 24px; font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
+        td { padding: 18px 24px; border-bottom: 1px solid #f1f5f9; font-size: 0.9rem; vertical-align: middle; }
+
+        .row-active { background: #f0fdf4 !important; position: relative; }
+        .row-active::after { content: ''; position: absolute; left: 0; top: 0; height: 100%; width: 4px; background: var(--success); }
+        .row-failed { background: #fef2f2 !important; position: relative; }
+        .row-failed::after { content: ''; position: absolute; left: 0; top: 0; height: 100%; width: 4px; background: var(--danger); }
+        .badge-failed { background: #fee2e2; color: #991b1b; padding: 4px 10px; border-radius: 12px; font-weight: 800; font-size: 0.7rem; }
+        .badge-active { background: #dcfce7; color: #166534; padding: 4px 10px; border-radius: 12px; font-weight: 800; font-size: 0.7rem; }
+
+        .action-group { display: flex; gap: 8px; }
+        .btn-action { width: 36px; height: 36px; border-radius: 10px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; color: white; transition: 0.3s; }
+        .btn-edit { background: linear-gradient(135deg, #f59e0b, #d97706); }
+        .btn-delete { background: linear-gradient(135deg, #ef4444, #b91c1c); }
+        .btn-assign { background: linear-gradient(135deg, #10b981, #059669); }
+        .btn-eval { background: linear-gradient(135deg, #8b5cf6, #6d28d9); }
+        .btn-main { background: var(--primary); color: white; padding: 12px 24px; border-radius: 10px; border: none; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 10px; }
+
+        .modal-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(15, 23, 42, 0.7); z-index: 1000; display: none; justify-content: center; align-items: center; backdrop-filter: blur(4px); }
+        .modal-box { background: white; width: 850px; max-width: 95%; padding: 35px; border-radius: 24px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); max-height: 90vh; overflow-y: auto; }
+        .form-control { width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; outline: none; margin-top: 5px; }
+
+        .assign-container { display: flex; flex-direction: column; gap: 25px; }
+        .assign-section { background: #f8fafc; border: 1px solid var(--border); border-radius: 15px; padding: 15px; }
+        .assign-title { font-size: 0.75rem; font-weight: 800; color: var(--primary); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; text-transform: uppercase; }
+        .assign-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        .assign-row { display: flex; align-items: center; gap: 10px; background: white; padding: 12px; border: 1px solid #e2e8f0; border-radius: 10px; cursor: pointer; font-size: 0.85rem; font-weight: 600; transition: 0.2s; }
+        .assign-row:hover { border-color: var(--primary); background: #f0f4ff; }
+        .assign-row input { width: 18px; height: 18px; accent-color: var(--primary); }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="brand"><i class="fas fa-cube"></i><span>Geincos Admin</span></div>
+        <div class="menu-label">Analítica</div>
+        <a href="dashboard.html" class="menu-item"><i class="fas fa-chart-pie"></i> Dashboard</a>
+        <a href="reportes.html" class="menu-item"><i class="fas fa-file-invoice"></i> Reportes</a>
+        <a href="calidad-ia.html" class="menu-item"><i class="fas fa-check-circle"></i> Calidad IA</a>
+        <a href="resultados-pvp.html" class="menu-item"><i class="fas fa-trophy"></i> Resultados PvP</a>
+        <div class="menu-label">Gestión</div>
+        <a href="postulantes.html" class="menu-item active"><i class="fas fa-users"></i> Postulantes</a>
+        <a href="personal-activo.html" class="menu-item"><i class="fas fa-id-badge"></i> Personal Activo</a>
+        <a href="asistencia.html" class="menu-item"><i class="fas fa-calendar-check"></i> Asistencia</a>
+        <a href="materiales.html" class="menu-item"><i class="fas fa-book"></i> Materiales</a>
+        <a href="examenes.html" class="menu-item"><i class="fas fa-clipboard-check"></i> Exámenes</a>
+        <a href="simuladores.html" class="menu-item"><i class="fas fa-gamepad"></i> Simuladores</a>
+        <a href="ia-roleplay.html" class="menu-item"><i class="fas fa-robot"></i> IA Roleplay</a>
+        <div class="menu-item" style="margin-top:auto; color:var(--danger)" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Cerrar Sesión</div>
+    </div>
+
+    <div class="main-content">
+        <div class="header">
+            <div>
+                <h2>Gestión Maestra de Postulantes</h2>
+                <p style="color:var(--text-muted)">Monitoreo automático de asistencia y veredictos finales.</p>
+            </div>
+            <div style="display:flex; gap:10px">
+                <button class="btn-main" style="background:#10b981" onclick="exportPostulantesExcel()"><i class="fas fa-file-excel"></i> Descargar Excel</button>
+                <button class="btn-main" onclick="openModal('modalUser', 'create')"><i class="fas fa-plus"></i> Nuevo Postulante</button>
+            </div>
+        </div>
+
+        <div class="filters-bar">
+            <div class="filter-group"><label>Filtrar por Grupo</label><select id="groupFilter" class="filter-input" onchange="renderFullList()"><option value="all">Todos los grupos</option></select></div>
+            <div class="filter-group"><label>Buscar Postulante</label><input type="text" id="searchInput" class="filter-input" placeholder="Nombre, DNI..." onkeyup="renderFullList()"></div>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr><th>Registro</th><th>Postulante / DNI</th><th>Grupo</th><th>Cartera / Sup</th><th>Estado</th><th>Observación</th><th>Acciones</th></tr>
+                </thead>
+                <tbody id="tbList"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <datalist id="supervisoresList"></datalist>
+
+    <div class="modal-overlay" id="modalUser">
+        <div class="modal-box">
+            <h3>Gestión de Usuario</h3>
+            <input type="hidden" id="uId">
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-top:20px">
+                <div class="form-group"><label>Usuario</label><input id="uUser" class="form-control"></div>
+                <div class="form-group"><label>DNI</label><input id="uDni" class="form-control"></div>
+                
+                <div class="form-group"><label>Nombre Completo</label><input id="uNombre" class="form-control"></div>
+                <div class="form-group"><label>Contraseña (Academia)</label><input id="uPass" type="text" class="form-control" placeholder="Contraseña visible"></div>
+                
+                <div class="form-group"><label>Grupo</label><input id="uTag" class="form-control"></div>
+                <div class="form-group"><label>Tipo de Usuario</label>
+                    <select id="uTipo" class="form-control">
+                        <option value="capacitacion">Postulante (Capacitación)</option>
+                        <option value="trabajador">Trabajador (Operativo)</option>
+                        <option value="supervisor">Supervisor</option>
+                        <option value="calidad">Calidad</option>
+                    </select>
+                </div>
+            </div>
+
+            <div style="margin-top:20px; padding-top:15px; border-top:1px solid #eee">
+                <h4 style="color:var(--primary); font-size:0.9rem; margin-bottom:10px"><i class="fas fa-key"></i> Accesos Plataforma Externa</h4>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px">
+                    <div><label>Usuario Plataforma</label><input id="uPlatUser" class="form-control"></div>
+                    <div><label>Contraseña Plataforma</label><input id="uPlatPass" class="form-control"></div>
+                </div>
+            </div>
+
+            <div style="margin-top:20px; padding-top:15px; border-top:1px solid #eee">
+                <h4 style="color:var(--primary); font-size:0.9rem; margin-bottom:10px"><i class="fas fa-briefcase"></i> Datos Operativos</h4>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px">
+                    <div><label>Cartera</label><input id="uCartera" class="form-control"></div>
+                    <div><label>Supervisor</label><input id="uSupervisor" list="supervisoresList" class="form-control" placeholder="Escribe o selecciona..."></div>
+                </div>
+                <div style="margin-top:10px"><label>Observación</label><textarea id="uObs" class="form-control" rows="2"></textarea></div>
+            </div>
+
+            <div style="text-align:right; margin-top:25px">
+                <button class="btn-main" style="background:#64748b" onclick="closeModals()">Cancelar</button>
+                <button class="btn-main" onclick="saveUser()">Guardar Cambios</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modalAssign">
+        <div class="modal-box">
+            <h3 id="assignTitle" style="margin-bottom:15px">Sincronizar Malla Curricular</h3>
+            
+            <div style="margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid var(--border);">
+                <label style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; display: block; margin-bottom: 5px;">Filtrar por Módulo</label>
+                <select id="assignModuleFilter" class="form-control" onchange="filterAssignModules()">
+                    <option value="all">Todos los módulos</option>
+                </select>
+            </div>
+
+            <div class="assign-container">
+                <div class="assign-section">
+                    <div class="assign-title"><i class="fas fa-play-circle"></i> Cursos Multimedia</div>
+                    <div class="assign-grid" id="listVideos"></div>
+                </div>
+                <div class="assign-section">
+                    <div class="assign-title"><i class="fas fa-file-signature"></i> Evaluaciones y Simuladores</div>
+                    <div class="assign-grid" id="listExams"></div>
+                </div>
+                <div class="assign-section">
+                    <div class="assign-title"><i class="fas fa-robot"></i> IA Roleplay</div>
+                    <div class="assign-grid" id="listIA"></div>
+                </div>
+            </div>
+            <div style="text-align:right; margin-top:30px">
+                <button class="btn-main" style="background:#64748b" onclick="closeModals()">Cancelar</button>
+                <button class="btn-main" onclick="executeAssignment()">Guardar Malla</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modalEval">
+        <div class="modal-box" style="max-width: 550px">
+            <h3>Veredicto Final de Ingreso</h3>
+            <input type="hidden" id="evalUserId">
+            <div style="margin-top:20px">
+                <label>Resultado Final</label>
+                <select id="evalStatus" class="form-control" onchange="toggleEvalFields()" style="font-weight:700">
+                    <option value="">-- Seleccionar Veredicto --</option>
+                    <option value="Aprobado">APROBADO (Pasa a Cartera)</option>
+                    <option value="Desaprobado">NO PASA (Desaprobado)</option>
+                </select>
+            </div>
+            
+            <div id="evalPassFields" style="display:none; margin-top:15px; padding:20px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:12px;">
+                <h4 style="color:#166534; margin: 0 0 15px 0; font-size:0.9rem;"><i class="fas fa-check-circle"></i> Configuración de Pase a Cartera</h4>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px">
+                    <div><label style="color:#166534">Asignar Cartera</label><input id="evalCartera" class="form-control" style="border-color:#bbf7d0"></div>
+                    <div><label style="color:#166534">Asignar Supervisor</label><input id="evalSupervisor" list="supervisoresList" class="form-control" style="border-color:#bbf7d0" placeholder="Escribe o selecciona..."></div>
+                </div>
+                <div style="margin-top:15px">
+                    <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:700; color:#166534; font-size:0.9rem">
+                        <input type="checkbox" id="evalCert" style="width:20px; height:20px; accent-color:#10b981;"> 
+                        Habilitar Certificado de Capacitación
+                    </label>
+                </div>
+            </div>
+
+            <div style="margin-top:15px">
+                <label>Observación Final / Justificación</label>
+                <textarea id="evalObs" class="form-control" rows="3"></textarea>
+            </div>
+            <div style="text-align:right; margin-top:25px">
+                <button class="btn-main" style="background:#64748b" onclick="closeModals()">Cancelar</button>
+                <button class="btn-main" onclick="saveEvaluation()">Confirmar Veredicto</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SB_URL = 'https://xgvfcmadsprjyljtpooo.supabase.co';
+        const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhndmZjbWFkc3ByanlsanRwb29vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY1ODMxNjAsImV4cCI6MjA4MjE1OTE2MH0.XYBbKFE17PfyYMn2SNL5UJrCQmDRbimTQO0jpbX1Zd0';
+        const sbClient = supabase.createClient(SB_URL, SB_KEY);
+        
+        let rawData = [], allMaterials = [], allIA = [], currentAssignUser = '';
+
+        window.onload = async () => { await loadInitialData(); await loadCatalogData(); await loadSupervisorsList(); };
+
+        async function loadCatalogData() {
+            const { data: cursos } = await sbClient.from('cursos').select('*');
+            const { data: escenarios } = await sbClient.from('roleplay_scenarios').select('*');
+            allMaterials = cursos || [];
+            allIA = escenarios || [];
+            
+            // Llenar el filtro de módulos
+            let allModules = new Set();
+            allMaterials.forEach(m => allModules.add(m.modulo || 'General'));
+            allIA.forEach(i => allModules.add(i.modulo || 'General'));
+            
+            const sel = document.getElementById('assignModuleFilter');
+            sel.innerHTML = '<option value="all">Todos los módulos</option>';
+            [...allModules].sort().forEach(mod => {
+                sel.innerHTML += `<option value="${mod}">${mod}</option>`;
+            });
+        }
+
+        async function loadSupervisorsList() {
+            const { data } = await sbClient.from('usuarios').select('usuario').eq('tipo', 'supervisor');
+            const datalist = document.getElementById('supervisoresList');
+            datalist.innerHTML = ''; 
+            
+            if(data) {
+                data.forEach(s => {
+                    datalist.innerHTML += `<option value="${s.usuario}">`;
+                });
+            }
+        }
+
+        async function loadInitialData() {
+            const { data: users } = await sbClient.from('usuarios').select('*').neq('rol','admin').order('created_at', {ascending: false});
+            const { data: attendance } = await sbClient.from('asistencias').select('usuario, estado');
+
+            if (users && attendance) {
+                for (let u of users) {
+                    const hasFalta = attendance.some(a => a.usuario === u.usuario && (a.estado === 'F' || a.estado === 'Falta'));
+                    if (hasFalta && u.estado_capacitacion !== 'Desaprobado' && u.tipo !== 'trabajador') {
+                        await sbClient.from('usuarios').update({ estado_capacitacion: 'Desaprobado', observacion: "FALTA REGISTRADA AUTOMÁTICAMENTE" }).eq('id', u.id);
+                        u.estado_capacitacion = 'Desaprobado';
+                    }
+                }
+            }
+            rawData = users || [];
+            fillGroupFilter();
+            renderFullList();
+        }
+
+        function fillGroupFilter() {
+            const groups = [...new Set(rawData.map(u => u.etiqueta))].filter(g => g).sort();
+            const sel = document.getElementById('groupFilter');
+            groups.forEach(g => sel.innerHTML += `<option value="${g}">${g}</option>`);
+        }
+
+        function renderFullList() {
+            const filterGroup = document.getElementById('groupFilter').value;
+            const searchText = document.getElementById('searchInput').value.toLowerCase();
+            let h = '';
+            const filtered = rawData.filter(u => (filterGroup === 'all' || u.etiqueta === filterGroup) && (u.usuario.toLowerCase().includes(searchText) || u.dni.includes(searchText)));
+
+            filtered.forEach(u => {
+                const isActive = u.tipo === 'trabajador';
+                const isFailed = u.estado_capacitacion === 'Desaprobado';
+                let rowCls = isActive ? 'row-active' : (isFailed ? 'row-failed' : '');
+                let stLabel = isActive ? `<span class="badge-active">CARTERA</span>` : (isFailed ? `<span class="badge-failed">DESAPROBADO</span>` : (u.estado_capacitacion || 'En Curso'));
+                
+                h += `<tr class="${rowCls}">
+                    <td>${new Date(u.created_at).toLocaleDateString()}</td>
+                    <td><b>${u.correo || u.usuario}</b><br><small>DNI: ${u.dni}</small></td>
+                    <td>${u.etiqueta || '-'}</td>
+                    <td><b>C:</b> ${u.cartera || '-'}<br><small><b>S:</b> ${u.supervisor || '-'}</small></td>
+                    <td>${stLabel}</td>
+                    <td><small>${u.observacion || '-'}</small></td>
+                    <td>
+                        <div class="action-group">
+                            <button class="btn-action btn-assign" onclick="openAssignModal('${u.usuario}')" title="Asignar"><i class="fas fa-book"></i></button>
+                            <button class="btn-action btn-edit" onclick="editUser('${u.id}')" title="Editar"><i class="fas fa-pen"></i></button>
+                            <button class="btn-action btn-eval" onclick="openEvalModal('${u.id}')" title="Evaluar"><i class="fas fa-graduation-cap"></i></button>
+                            <button class="btn-action btn-delete" onclick="delUser('${u.id}')" title="Borrar"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </td>
+                </tr>`;
+            });
+            document.getElementById('tbList').innerHTML = h;
+        }
+
+        function editUser(id) {
+            const u = rawData.find(x => x.id == id);
+            if(u) {
+                document.getElementById('uId').value = u.id;
+                document.getElementById('uUser').value = u.usuario;
+                document.getElementById('uDni').value = u.dni;
+                document.getElementById('uNombre').value = u.correo || '';
+                document.getElementById('uPass').value = u.password || ''; 
+                document.getElementById('uTag').value = u.etiqueta || '';
+                document.getElementById('uTipo').value = u.tipo || 'capacitacion';
+                
+                document.getElementById('uPlatUser').value = u.usuario_plataforma || '';
+                document.getElementById('uPlatPass').value = u.password_plataforma || '';
+                
+                document.getElementById('uCartera').value = u.cartera || '';
+                document.getElementById('uSupervisor').value = u.supervisor || '';
+                document.getElementById('uObs').value = u.observacion || '';
+
+                document.getElementById('modalUser').style.display = 'flex';
+            }
+        }
+
+        async function saveUser() {
+            const id = document.getElementById('uId').value;
+            const upd = {
+                usuario: document.getElementById('uUser').value,
+                dni: document.getElementById('uDni').value,
+                correo: document.getElementById('uNombre').value,
+                password: document.getElementById('uPass').value, 
+                etiqueta: document.getElementById('uTag').value,
+                tipo: document.getElementById('uTipo').value,
+                usuario_plataforma: document.getElementById('uPlatUser').value,
+                password_plataforma: document.getElementById('uPlatPass').value,
+                cartera: document.getElementById('uCartera').value,
+                supervisor: document.getElementById('uSupervisor').value,
+                observacion: document.getElementById('uObs').value
+            };
+            if(!id) {
+                await sbClient.from('usuarios').insert([upd]);
+            } else {
+                await sbClient.from('usuarios').update(upd).eq('id', id);
+            }
+            alert("Datos guardados correctamente"); closeModals(); loadInitialData();
+        }
+
+        function toggleEvalFields() {
+            const status = document.getElementById('evalStatus').value;
+            document.getElementById('evalPassFields').style.display = (status === 'Aprobado') ? 'block' : 'none';
+        }
+
+        function openEvalModal(id) {
+            document.getElementById('evalUserId').value = id;
+            
+            document.getElementById('evalStatus').value = '';
+            document.getElementById('evalCartera').value = '';
+            document.getElementById('evalSupervisor').value = '';
+            document.getElementById('evalCert').checked = false;
+            document.getElementById('evalObs').value = '';
+            
+            toggleEvalFields(); 
+            document.getElementById('modalEval').style.display = 'flex';
+        }
+
+        async function saveEvaluation() {
+            const id = document.getElementById('evalUserId').value;
+            const status = document.getElementById('evalStatus').value;
+            
+            if(!status) return alert("Debe seleccionar un veredicto (Aprobado o Desaprobado).");
+
+            const upd = { 
+                estado_capacitacion: status, 
+                observacion: document.getElementById('evalObs').value 
+            };
+            
+            if(status === 'Aprobado') {
+                upd.tipo = 'trabajador'; 
+                upd.cartera = document.getElementById('evalCartera').value;
+                upd.supervisor = document.getElementById('evalSupervisor').value;
+                upd.fecha_cartera = new Date().toISOString().split('T')[0];
+                
+                if(document.getElementById('evalCert').checked) {
+                    upd.certificados_json = JSON.stringify(["CAPACITACION FINALIZADA"]);
+                }
+            }
+            
+            await sbClient.from('usuarios').update(upd).eq('id', id);
+            alert("Veredicto registrado exitosamente."); closeModals(); loadInitialData();
+        }
+
+        async function openAssignModal(user) {
+            currentAssignUser = user;
+            document.getElementById('assignTitle').innerText = `Malla de: ${user}`;
+            const { data } = await sbClient.from('asignaciones').select('cursos_json').eq('usuario', user).maybeSingle();
+            let currentList = data ? JSON.parse(data.cursos_json) : [];
+
+            let hV = '', hE = '', hI = '';
+            allMaterials.forEach(m => {
+                const checked = currentList.includes(m.titulo) ? 'checked' : '';
+                const mod = m.modulo || 'General';
+                const row = `<label class="assign-row" data-modulo="${mod}"><input type="checkbox" class="chk-m" value="${m.titulo}" ${checked}> <span style="flex:1">${m.titulo}</span> <small style="color:var(--primary); font-size:0.7rem; background:#eef2ff; padding:2px 6px; border-radius:4px">${mod}</small></label>`;
+                if (m.tipo === 'video') hV += row; else hE += row;
+            });
+            allIA.forEach(i => {
+                const checked = currentList.includes(i.titulo) ? 'checked' : '';
+                const mod = i.modulo || 'General';
+                hI += `<label class="assign-row" data-modulo="${mod}" style="border-left: 4px solid var(--primary)"><input type="checkbox" class="chk-m" value="${i.titulo}" ${checked}> <span style="flex:1">${i.titulo}</span> <small style="color:var(--primary); font-size:0.7rem; background:#eef2ff; padding:2px 6px; border-radius:4px">${mod}</small></label>`;
+            });
+            
+            document.getElementById('listVideos').innerHTML = hV || '<p style="color:#999">Sin videos.</p>';
+            document.getElementById('listExams').innerHTML = hE || '<p style="color:#999">Sin exámenes.</p>';
+            document.getElementById('listIA').innerHTML = hI || '<p style="color:#999">Sin escenarios.</p>';
+            
+            // Resetear filtro al abrir
+            document.getElementById('assignModuleFilter').value = 'all';
+            filterAssignModules();
+
+            document.getElementById('modalAssign').style.display = 'flex';
+        }
+
+        function filterAssignModules() {
+            const filterVal = document.getElementById('assignModuleFilter').value;
+            const rows = document.querySelectorAll('.assign-row');
+            
+            rows.forEach(row => {
+                if(filterVal === 'all' || row.getAttribute('data-modulo') === filterVal) {
+                    row.style.display = 'flex';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+
+        async function executeAssignment() {
+            const list = Array.from(document.querySelectorAll('.chk-m:checked')).map(c => c.value);
+            await sbClient.from('asignaciones').upsert({ usuario: currentAssignUser, cursos_json: JSON.stringify(list) }, { onConflict: 'usuario' });
+            alert('Malla sincronizada.'); closeModals();
+        }
+
+        function openModal(id, mode) {
+            document.getElementById(id).style.display = 'flex';
+            if(mode === 'create') {
+                document.getElementById('uId').value = '';
+                document.querySelectorAll('#modalUser input, #modalUser textarea').forEach(i => i.value = '');
+                document.getElementById('uTipo').value = 'capacitacion';
+            }
+        }
+        function closeModals() { document.querySelectorAll('.modal-overlay').forEach(m => m.style.display = 'none'); }
+        function logout() { localStorage.clear(); window.location.href='index.html'; }
+        async function delUser(id) { if(confirm('¿Eliminar registro?')) { await sbClient.from('usuarios').delete().eq('id', id); loadInitialData(); } }
+        function exportPostulantesExcel() { 
+            const data = rawData.map(u => ({ "Fecha": new Date(u.created_at).toLocaleDateString(), "Nombre": u.correo || u.usuario, "DNI": u.dni, "Grupo": u.etiqueta, "Estado": u.estado_capacitacion, "Cartera": u.cartera, "Supervisor": u.supervisor, "Observación": u.observacion }));
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Postulantes");
+            XLSX.writeFile(wb, "Postulantes_Maestro.xlsx");
+        }
+    </script>
+</body>
+</html>
